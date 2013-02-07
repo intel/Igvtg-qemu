@@ -245,6 +245,7 @@ static int vgt_initfn(PCIDevice *dev)
 {
     VGTVGAState *d = DO_UPCAST(VGTVGAState, dev, dev);
 
+    printf("vgt_initfn\n");
     d->instance_created = FALSE;
 
     xen_host_pci_device_get(&d->host_dev, xen_domid, 0, 0x1f, 0);
@@ -275,7 +276,12 @@ DeviceState *xengt_vga_init(PCIBus *pci_bus)
     xen_host_pci_device_put(&host_dev);
 
     dev = pci_create_multifunction(pci_bus, PCI_DEVFN(0x1f, 0), true,
-                                   "xengt-vga");
+                                   "xengt-isa");
+    if (!dev) {
+        fprintf(stderr, "Warning: vga-xengt not available\n");
+        return NULL;
+    }
+
     qdev_init_nofail(&dev->qdev);
 
     pci_config_set_vendor_id(dev->config, host_dev.vendor_id);
@@ -285,16 +291,22 @@ DeviceState *xengt_vga_init(PCIBus *pci_bus)
     pci_bridge_map_irq(br, "IGD Bridge",
                        pch_map_irq);
 
+    printf("Create xengt ISA bridge successfully\n");
+
+    dev = pci_create_multifunction(pci_bus, PCI_DEVFN(0x2, 0), true,
+                                   "xengt-vga");
     if (!dev) {
         fprintf(stderr, "Warning: vga-xengt not available\n");
         return NULL;
     }
-
+    qdev_init_nofail(&dev->qdev);
+    printf("Create xengt VGA successfully\n");
     return &dev->qdev;
 }
 
 static void vgt_class_initfn(ObjectClass *klass, void *data)
 {
+    printf("vgt_class_initfn\n");
     DeviceClass *dc = DEVICE_CLASS(klass);
     PCIDeviceClass *ic = PCI_DEVICE_CLASS(klass);
     ic->init = vgt_initfn;
@@ -310,9 +322,16 @@ static TypeInfo vgt_info = {
     .class_init    = vgt_class_initfn,
 };
 
+static TypeInfo isa_info = {
+    .name          = "xengt-isa",
+    .parent        = TYPE_PCI_DEVICE,
+    .instance_size = sizeof(VGTVGAState),
+};
+
 static void vgt_register_types(void)
 {
     type_register_static(&vgt_info);
+    type_register_static(&isa_info);
 }
 
 type_init(vgt_register_types)

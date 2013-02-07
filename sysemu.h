@@ -102,7 +102,7 @@ typedef enum {
 extern int vga_interface_type;
 #define xenfb_enabled (vga_interface_type == VGA_XENFB)
 #define qxl_enabled (vga_interface_type == VGA_QXL)
-#define xengt_vga_enabled (vga_interface_type == VGA_XENGT)
+#define xengt_vga_enabled (vga_interface_type == VGA_CIRRUS)
 
 extern int graphic_width;
 extern int graphic_height;

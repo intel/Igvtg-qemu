@@ -46,6 +46,7 @@
 #include "cpu.h"
 #ifdef CONFIG_XEN
 #  include <xen/hvm/hvm_info_table.h>
+#  include "vga-xengt.h"
 #endif
 
 #define MAX_IDE_BUS 2
@@ -162,12 +163,25 @@ static void pc_init1(MemoryRegion *system_memory,
 
     pc_register_ferr_irq(gsi[13]);
 
+    /*
+     * Initialize XenGT hooks before normal VGA init. The
+     * ideal case is to have IGD presented as the primary
+     * graphics card in 00:02.0, and then have other emulated
+     * PCI VGA card all disabled. We still rely on Qemu to
+     * emulate legacy ISA ports, so requires the ISA vga logic.
+     *
+     * HOWEVER, in this new qemu version, seabios has problem
+     * to work in such situation. The only workable way now,
+     * is to have IGD presented as the secondary card, while
+     * having Cirrus VGA as the primary VGA card, to support
+     * seabios. Xorg.conf needs be updated to use IGD when 
+     * starting X.
+     */
     if (xengt_vga_enabled && pci_enabled) {
         xengt_vga_init(pci_bus);
-        pc_vga_init(isa_bus, NULL);
-    } else {
-        pc_vga_init(isa_bus, pci_enabled ? pci_bus : NULL);
+        //isa_create_simple(isa_bus, "isa-vga");
     }
+    pc_vga_init(isa_bus, pci_enabled ? pci_bus : NULL);
 
     if (xen_enabled()) {
         pci_create_simple(pci_bus, -1, "xen-platform");
