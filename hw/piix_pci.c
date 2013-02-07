@@ -31,7 +31,10 @@
 #include "range.h"
 #include "xen.h"
 #include "pam.h"
-
+#include "sysemu.h"
+#ifdef CONFIG_XEN
+#include "vga-xengt.h"
+#endif
 /*
  * I440FX chipset data sheet.
  * http://download.intel.com/design/chipsets/datashts/29054901.pdf
@@ -136,6 +139,8 @@ static void i440fx_write_config(PCIDevice *dev,
         range_covers_byte(address, len, I440FX_SMRAM)) {
         i440fx_update_memory_mappings(d);
     }
+
+    vgt_bridge_pci_write(dev, address, val, len);
 }
 
 static int i440fx_load_old(QEMUFile* f, void *opaque, int version_id)
@@ -204,6 +209,11 @@ static int i440fx_initfn(PCIDevice *dev)
     d->dev.config[I440FX_SMRAM] = 0x02;
 
     cpu_smm_register(&i440fx_set_smm, d);
+
+    if (xengt_vga_enabled) {
+        vgt_bridge_pci_conf_init(dev);
+    }
+
     return 0;
 }
 
@@ -547,6 +557,10 @@ static void i440fx_class_init(ObjectClass *klass, void *data)
     dc->desc = "Host bridge";
     dc->no_user = 1;
     dc->vmsd = &vmstate_i440fx;
+    if (xengt_vga_enabled) {
+        k->config_read = vgt_bridge_pci_read;
+    }
+
 }
 
 static const TypeInfo i440fx_info = {

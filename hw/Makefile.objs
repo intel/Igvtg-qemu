@@ -133,6 +133,7 @@ common-obj-$(CONFIG_VGA_ISA_MM) += vga-isa-mm.o
 common-obj-$(CONFIG_VMWARE_VGA) += vmware_vga.o
 common-obj-$(CONFIG_VMMOUSE) += vmmouse.o
 common-obj-$(CONFIG_VGA_CIRRUS) += cirrus_vga.o
+common-obj-y += vga-xengt.o
 
 common-obj-$(CONFIG_RC4030) += rc4030.o
 common-obj-$(CONFIG_DP8393X) += dp8393x.o

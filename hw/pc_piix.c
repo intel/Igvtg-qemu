@@ -162,7 +162,13 @@ static void pc_init1(MemoryRegion *system_memory,
 
     pc_register_ferr_irq(gsi[13]);
 
-    pc_vga_init(isa_bus, pci_enabled ? pci_bus : NULL);
+    if (xengt_vga_enabled && pci_enabled) {
+        xengt_vga_init(pci_bus);
+        pc_vga_init(isa_bus, NULL);
+    } else {
+        pc_vga_init(isa_bus, pci_enabled ? pci_bus : NULL);
+    }
+
     if (xen_enabled()) {
         pci_create_simple(pci_bus, -1, "xen-platform");
     }

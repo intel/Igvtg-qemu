@@ -96,12 +96,13 @@ extern int autostart;
 extern int bios_size;
 
 typedef enum {
-    VGA_NONE, VGA_STD, VGA_CIRRUS, VGA_VMWARE, VGA_XENFB, VGA_QXL,
+    VGA_NONE, VGA_STD, VGA_CIRRUS, VGA_VMWARE, VGA_XENFB, VGA_QXL, VGA_XENGT
 } VGAInterfaceType;
 
 extern int vga_interface_type;
 #define xenfb_enabled (vga_interface_type == VGA_XENFB)
 #define qxl_enabled (vga_interface_type == VGA_QXL)
+#define xengt_vga_enabled (vga_interface_type == VGA_XENGT)
 
 extern int graphic_width;
 extern int graphic_height;

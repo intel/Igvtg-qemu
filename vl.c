@@ -1848,6 +1848,8 @@ static void select_vgahw (const char *p)
             fprintf(stderr, "Error: standard VGA not available\n");
             exit(0);
         }
+    } else if (strstart(p, "xengt", &opts)) {
+        vga_interface_type = VGA_XENGT;
     } else if (strstart(p, "cirrus", &opts)) {
         if (cirrus_vga_available()) {
             vga_interface_type = VGA_CIRRUS;

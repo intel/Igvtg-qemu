@@ -378,6 +378,11 @@ int xen_host_pci_device_get(XenHostPCIDevice *d, uint16_t domain,
     d->irq = v;
     d->is_virtfn = xen_host_pci_dev_is_virtfn(d);
 
+    rc = xen_host_pci_get_byte(d, 0x08, &d->revision_id);
+    if (rc) {
+        goto error;
+    }
+
     return 0;
 error:
     if (d->config_fd >= 0) {

@@ -25,6 +25,7 @@ typedef struct XenHostPCIDevice {
 
     uint16_t vendor_id;
     uint16_t device_id;
+    uint16_t revision_id;
     int irq;
 
     XenHostPCIIORegion io_regions[PCI_NUM_REGIONS - 1];
