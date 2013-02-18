@@ -47,10 +47,10 @@ typedef struct VGTVGAState {
 } VGTVGAState;
 
 /* These are the default values */
-int vgt_aperture_sz = 64; /* in MB */
+int vgt_aperture_sz = 128; /* in MB */
 int vgt_gm_sz = 512; /* in MB */
 int vgt_fence_sz = 4;
-int vgt_primary = -1; /* -1 means "not specified */
+int vgt_primary = 1; /* -1 means "not specified */
 
 /*
  *  Inform vGT driver to create a vGT instance
