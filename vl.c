@@ -1857,7 +1857,6 @@ static void select_vgahw (const char *p)
             fprintf(stderr, "Error: Cirrus VGA not available\n");
             exit(0);
         }
-        vga_interface_type = VGA_XENGT;
     } else if (strstart(p, "vmware", &opts)) {
         if (vmware_vga_available()) {
             vga_interface_type = VGA_VMWARE;
@@ -1879,6 +1878,8 @@ static void select_vgahw (const char *p)
         fprintf(stderr, "Unknown vga type: %s\n", p);
         exit(1);
     }
+    //HACK
+    vga_interface_type = VGA_XENGT;
     while (*opts) {
         const char *nextopt;
 

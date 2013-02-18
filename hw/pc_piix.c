@@ -169,13 +169,6 @@ static void pc_init1(MemoryRegion *system_memory,
      * graphics card in 00:02.0, and then have other emulated
      * PCI VGA card all disabled. We still rely on Qemu to
      * emulate legacy ISA ports, so requires the ISA vga logic.
-     *
-     * HOWEVER, in this new qemu version, seabios has problem
-     * to work in such situation. The only workable way now,
-     * is to have IGD presented as the secondary card, while
-     * having Cirrus VGA as the primary VGA card, to support
-     * seabios. Xorg.conf needs be updated to use IGD when 
-     * starting X.
      */
     if (xengt_vga_enabled && pci_enabled) {
         xengt_vga_init(pci_bus);
