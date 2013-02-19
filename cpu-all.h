@@ -476,6 +476,9 @@ hwaddr cpu_get_phys_page_debug(CPUArchState *env, target_ulong addr);
 
 extern int phys_ram_fd;
 extern ram_addr_t ram_size;
+extern int vgt_aperture_sz;
+extern int vgt_gm_sz;
+extern int vgt_fence_sz;
 
 /* RAM is pre-allocated and passed into qemu_ram_alloc_from_ptr */
 #define RAM_PREALLOC_MASK   (1 << 0)

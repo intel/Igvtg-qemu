@@ -1878,8 +1878,6 @@ static void select_vgahw (const char *p)
         fprintf(stderr, "Unknown vga type: %s\n", p);
         exit(1);
     }
-    //HACK
-    vga_interface_type = VGA_XENGT;
     while (*opts) {
         const char *nextopt;
 
@@ -3524,6 +3522,26 @@ int main(int argc, char **argv, char **envp)
             case QEMU_OPTION_object:
                 opts = qemu_opts_parse(qemu_find_opts("object"), optarg, 1);
                 break;
+            case QEMU_OPTION_vgt_aperture_sz:
+                {
+                    extern int vgt_aperture_sz;
+                    char *ptr;
+                    vgt_aperture_sz = strtol(optarg,&ptr,10);
+                }
+                break;
+            case QEMU_OPTION_vgt_gm_sz:
+                {
+                    extern int vgt_gm_sz;
+                    char *ptr;
+                    vgt_gm_sz = strtol(optarg,&ptr,10);
+                }
+                break;
+            case QEMU_OPTION_vgt_fence_sz:
+                {
+                    extern int vgt_fence_sz;
+                    char *ptr;
+                    vgt_fence_sz = strtol(optarg,&ptr,10);
+                }
             default:
                 os_parse_cmd_args(popt->index, optarg);
             }

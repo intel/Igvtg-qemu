@@ -1004,7 +1004,7 @@ Rotate graphical output some deg left (only PXA LCD).
 ETEXI
 
 DEF("vga", HAS_ARG, QEMU_OPTION_vga,
-    "-vga [std|cirrus|vmware|qxl|xenfb|none]\n"
+    "-vga [std|cirrus|vmware|qxl|xenfb|xengt|none]\n"
     "                select video card type\n", QEMU_ARCH_ALL)
 STEXI
 @item -vga @var{type}
@@ -1029,9 +1029,40 @@ card.
 QXL paravirtual graphic card.  It is VGA compatible (including VESA
 2.0 VBE support).  Works best with qxl guest drivers installed though.
 Recommended choice when using the spice protocol.
+@item xengt
+Intel IGD card based on mediated pass-through technique. A single
+IGD card can be used to accelerate multiple VMs, which each run
+native graphics driver inside.
 @item none
 Disable VGA card.
 @end table
+ETEXI
+
+DEF("vgt_aperture_sz", 1, QEMU_OPTION_vgt_aperture_sz,
+    "-vgt_aperture_sz [MB] allocated aperture size\n",
+    QEMU_ARCH_ALL)
+STEXI
+@item -vgt_aperture_sz @var{size}
+@findex -vgt_aperture_sz
+Set the allocated aperture size.
+ETEXI
+
+DEF("vgt_gm_sz", 1, QEMU_OPTION_vgt_gm_sz,
+    "-vgt_gm_sz [MB] allocated GM size\n",
+    QEMU_ARCH_ALL)
+STEXI
+@item -vgt_gm_sz @var{size}
+@findex -vgt_gm_sz
+Set the allocated aperture size.
+ETEXI
+
+DEF("vgt_fence_sz", 1, QEMU_OPTION_vgt_fence_sz,
+    "-vgt_fence_sz [num] allocated number of fence registers\n",
+    QEMU_ARCH_ALL)
+STEXI
+@item -vgt_fence_sz @var{size}
+@findex -vgt_fence_sz
+Set the allocated aperture size.
 ETEXI
 
 DEF("full-screen", 0, QEMU_OPTION_full_screen,
