@@ -176,6 +176,7 @@ static void vgt_bridge_pci_conf_init_from_host(PCIDevice *dev,
         uint32_t addr, int len)
 {
     VGTVGAState *o = DO_UPCAST(VGTVGAState, dev, dev);
+    XenHostPCIDevice host_dev;
 
     if(len > 4){
         XEN_PT_LOG(dev, "WARNIGN: length %x too large for config addr %x, ignore init\n",
@@ -183,7 +184,17 @@ static void vgt_bridge_pci_conf_init_from_host(PCIDevice *dev,
         return;
     }
 
-    xen_host_pci_get_block(&o->host_dev, addr, dev->config + addr, len);
+    /* FIXME: need a better scheme to grab the root complex. This
+     * only for a single VM scenario.
+    */
+    if( xen_host_pci_device_get(&host_dev, 0, 0, 0, 0) < 0)
+    {
+        fprintf(stderr, " Error, failed to get host PCI device\n");
+        return NULL;
+    }
+
+    xen_host_pci_get_block(&host_dev, addr, dev->config + addr, len);
+    xen_host_pci_device_put(&host_dev);
 }
 
 static void vgt_host_bridge_cap_init(PCIDevice *dev)
@@ -208,8 +219,13 @@ static void vgt_host_bridge_cap_init(PCIDevice *dev)
 
 void vgt_bridge_pci_conf_init(PCIDevice *pci_dev)
 {
+	printf("vgt_bridge_pci_conf_init\n");
+	printf("vendor id: %x\n", *(uint16_t *)((char *)pci_dev->config + 0x00));
 	vgt_bridge_pci_conf_init_from_host(pci_dev, 0x00, 2); /* vendor id */
+	printf("vendor id: %x\n", *(uint16_t *)((char *)pci_dev->config + 0x00));
+	printf("device id: %x\n", *(uint16_t *)((char *)pci_dev->config + 0x02));
 	vgt_bridge_pci_conf_init_from_host(pci_dev, 0x02, 2); /* device id */
+	printf("device id: %x\n", *(uint16_t *)((char *)pci_dev->config + 0x02));
 	vgt_bridge_pci_conf_init_from_host(pci_dev, 0x06, 2); /* status */
 	vgt_bridge_pci_conf_init_from_host(pci_dev, 0x08, 2); /* revision id */
 	vgt_bridge_pci_conf_init_from_host(pci_dev, 0x34, 1); /* capability */
@@ -247,8 +263,6 @@ static int vgt_initfn(PCIDevice *dev)
 
     printf("vgt_initfn\n");
     d->instance_created = FALSE;
-
-    xen_host_pci_device_get(&d->host_dev, xen_domid, 0, 0x1f, 0);
 
     create_vgt_instance();
     return 0;
@@ -300,6 +314,7 @@ DeviceState *xengt_vga_init(PCIBus *pci_bus)
         return NULL;
     }
     qdev_init_nofail(&dev->qdev);
+
     printf("Create xengt VGA successfully\n");
     return &dev->qdev;
 }

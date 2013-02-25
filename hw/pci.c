@@ -804,6 +804,7 @@ static PCIDevice *do_pci_register_device(PCIDevice *pci_dev, PCIBus *bus,
     pci_dev->irq_state = 0;
     pci_config_alloc(pci_dev);
 
+    printf("set vendor id(%x) for devfn(%x)\n", pc->vendor_id, devfn);
     pci_config_set_vendor_id(pci_dev->config, pc->vendor_id);
     pci_config_set_device_id(pci_dev->config, pc->device_id);
     pci_config_set_revision(pci_dev->config, pc->revision);
