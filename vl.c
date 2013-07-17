@@ -3522,18 +3522,18 @@ int main(int argc, char **argv, char **envp)
             case QEMU_OPTION_object:
                 opts = qemu_opts_parse(qemu_find_opts("object"), optarg, 1);
                 break;
-            case QEMU_OPTION_vgt_aperture_sz:
+            case QEMU_OPTION_vgt_low_gm_sz:
                 {
-                    extern int vgt_aperture_sz;
+                    extern int vgt_low_gm_sz;
                     char *ptr;
-                    vgt_aperture_sz = strtol(optarg,&ptr,10);
+                    vgt_low_gm_sz = strtol(optarg,&ptr,10);
                 }
                 break;
-            case QEMU_OPTION_vgt_gm_sz:
+            case QEMU_OPTION_vgt_high_gm_sz:
                 {
-                    extern int vgt_gm_sz;
+                    extern int vgt_high_gm_sz;
                     char *ptr;
-                    vgt_gm_sz = strtol(optarg,&ptr,10);
+                    vgt_high_gm_sz = strtol(optarg,&ptr,10);
                 }
                 break;
             case QEMU_OPTION_vgt_fence_sz:

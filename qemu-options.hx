@@ -1038,21 +1038,21 @@ Disable VGA card.
 @end table
 ETEXI
 
-DEF("vgt_aperture_sz", 1, QEMU_OPTION_vgt_aperture_sz,
-    "-vgt_aperture_sz [MB] allocated aperture size\n",
+DEF("vgt_low_gm_sz", 1, QEMU_OPTION_vgt_low_gm_sz,
+    "-vgt_low_gm_sz [MB] allocated aperture size\n",
     QEMU_ARCH_ALL)
 STEXI
-@item -vgt_aperture_sz @var{size}
-@findex -vgt_aperture_sz
+@item -vgt_low_gm_sz @var{size}
+@findex -vgt_low_gm_sz
 Set the allocated aperture size.
 ETEXI
 
-DEF("vgt_gm_sz", 1, QEMU_OPTION_vgt_gm_sz,
-    "-vgt_gm_sz [MB] allocated GM size\n",
+DEF("vgt_high_gm_sz", 1, QEMU_OPTION_vgt_high_gm_sz,
+    "-vgt_high_gm_sz [MB] allocated GM size\n",
     QEMU_ARCH_ALL)
 STEXI
-@item -vgt_gm_sz @var{size}
-@findex -vgt_gm_sz
+@item -vgt_high_gm_sz @var{size}
+@findex -vgt_high_gm_sz
 Set the allocated aperture size.
 ETEXI
 

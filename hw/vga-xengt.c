@@ -47,8 +47,8 @@ typedef struct VGTVGAState {
 } VGTVGAState;
 
 /* These are the default values */
-int vgt_aperture_sz = 64; /* in MB */
-int vgt_gm_sz = 512; /* in MB */
+int vgt_low_gm_sz = 64; /* in MB */
+int vgt_high_gm_sz = 448; /* in MB */
 int vgt_fence_sz = 4;
 int vgt_primary = 1; /* -1 means "not specified */
 
@@ -62,10 +62,10 @@ static void create_vgt_instance(void)
     FILE *vgt_file;
     int err = 0;
 
-    qemu_log("vGT: %s: domid=%d, aperture_sz=%dMB, gm_sz=%dMB, "
+    qemu_log("vGT: %s: domid=%d, low_gm_sz=%dMB, high_gm_sz=%dMB, "
         "fence_sz=%d, vgt_primary=%d\n", __func__, xen_domid,
-        vgt_aperture_sz, vgt_gm_sz, vgt_fence_sz, vgt_primary);
-    if (vgt_aperture_sz <= 0 ||  vgt_aperture_sz > vgt_gm_sz ||
+        vgt_low_gm_sz, vgt_high_gm_sz, vgt_fence_sz, vgt_primary);
+    if (vgt_low_gm_sz <= 0 || vgt_high_gm_sz <=0 ||
 		vgt_primary < -1 || vgt_primary > 1 ||
         vgt_fence_sz <=0) {
         qemu_log("vGT: %s failed: invalid parameters!\n", __func__);
@@ -82,7 +82,7 @@ static void create_vgt_instance(void)
      * parameters. NOTE: aperture_size and gm_size are in MB.
      */
     if (!err && fprintf(vgt_file, "%d,%u,%u,%u,%d\n", xen_domid,
-        vgt_aperture_sz, vgt_gm_sz, vgt_fence_sz, vgt_primary) < 0)
+        vgt_low_gm_sz, vgt_high_gm_sz, vgt_fence_sz, vgt_primary) < 0)
         err = errno;
 
     if (!err && fclose(vgt_file) != 0)
