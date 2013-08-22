@@ -35,6 +35,10 @@
 #ifdef CONFIG_XEN
 #include "vga-xengt.h"
 #endif
+#ifdef CONFIG_XEN_PCI_PASSTHROUGH
+#include "xen_pt.h"
+#endif
+
 /*
  * I440FX chipset data sheet.
  * http://download.intel.com/design/chipsets/datashts/29054901.pdf
@@ -305,6 +309,14 @@ static PCIBus *i440fx_common_init(const char *device_name,
     (*pi440fx_state)->dev.config[0x57]=ram_size;
 
     i440fx_update_memory_mappings(f);
+
+#if CONFIG_XEN_PCI_PASSTHROUGH
+    if (gfx_passthru) {
+        d->config_read = igd_pci_read;
+        d->config_write = igd_pci_write;
+        intel_pch_init(b);
+    }
+#endif
 
     return b;
 }

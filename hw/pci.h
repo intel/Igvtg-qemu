@@ -102,6 +102,8 @@ typedef struct PCIIORegion {
 
 #include "pci_regs.h"
 
+#define PCI_INTEL_OPREGION 0xfc
+
 /* PCI HEADER_TYPE */
 #define  PCI_HEADER_TYPE_MULTI_FUNCTION 0x80
 

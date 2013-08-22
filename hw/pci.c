@@ -34,6 +34,7 @@
 #include "msi.h"
 #include "msix.h"
 #include "exec-memory.h"
+#include "xen_pt.h"
 
 //#define DEBUG_PCI
 #ifdef DEBUG_PCI
@@ -770,7 +771,7 @@ static PCIDevice *do_pci_register_device(PCIDevice *pci_dev, PCIBus *bus,
             devfn += PCI_FUNC_MAX) {
 
             /* If vGT/XenGT is in use, reserve 00:02.* for the IGD */
-            if (xengt_vga_enabled && devfn == 0x10)
+            if ((xengt_vga_enabled || gfx_passthru) && devfn == 0x10)
                 continue; 
 
             if (!bus->devices[devfn])

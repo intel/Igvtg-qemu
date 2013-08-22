@@ -1003,6 +1003,15 @@ STEXI
 Rotate graphical output some deg left (only PXA LCD).
 ETEXI
 
+DEF("gfx_passthru", 0, QEMU_OPTION_gfx_passthru,
+    "-gfx_passthru   enable Intel IGD passthrough by XEN\n",
+    QEMU_ARCH_ALL)
+STEXI
+@item -gfx_passthru
+@findex -gfx_passthru
+Enable Intel IGD passthrough by XEN
+ETEXI
+
 DEF("vga", HAS_ARG, QEMU_OPTION_vga,
     "-vga [std|cirrus|vmware|qxl|xenfb|xengt|none]\n"
     "                select video card type\n", QEMU_ARCH_ALL)

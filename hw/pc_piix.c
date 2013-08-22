@@ -48,7 +48,9 @@
 #  include <xen/hvm/hvm_info_table.h>
 #  include "vga-xengt.h"
 #endif
-
+#ifdef CONFIG_XEN_PCI_PASSTHROUGH
+#include "xen_pt.h"
+#endif
 #define MAX_IDE_BUS 2
 
 static const int ide_iobase[MAX_IDE_BUS] = { 0x1f0, 0x170 };
@@ -173,6 +175,18 @@ static void pc_init1(MemoryRegion *system_memory,
     if (xengt_vga_enabled && pci_enabled) {
         xengt_vga_init(pci_bus);
         isa_create_simple(isa_bus, "isa-vga");
+    } else if (gfx_passthru) {
+        /*
+         * Do not create emulated VGA card here.
+         * and wait QEMU create qdev: xen-pci-passthrough,
+         * which is a pass-throughed IGD device.
+         * 
+         * We need a dummy graphic console here.
+         * otherwise QEMU will not have a vaild console,
+         * and we have to passthrough mouse and keyboard
+         * to control VM.
+         */
+        graphic_console_init(NULL, NULL, NULL, NULL, NULL);
     } else {
         pc_vga_init(isa_bus, pci_enabled ? pci_bus : NULL);
     }

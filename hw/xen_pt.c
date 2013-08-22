@@ -450,6 +450,21 @@ static int xen_pt_register_regions(XenPCIPassthroughState *s)
                    d->rom.size, d->rom.base_addr);
     }
 
+    if (gfx_passthru) {
+        /*
+         * Do not use vendor and class from PCIDevice,
+         * since no one populates them at this time.
+         */
+        uint16_t vendor = pci_get_word(s->dev.config + PCI_VENDOR_ID);
+        uint16_t class = pci_get_word(s->dev.config + PCI_CLASS_DEVICE);
+
+        /* Legacy VGA passthrough. */
+        if (vendor == PCI_VENDOR_ID_INTEL && class == PCI_CLASS_DISPLAY_VGA) {
+            register_vga_regions(&s->dev);
+            setup_vga_pt(&s->dev);
+        }
+    }
+
     return 0;
 }
 
@@ -469,6 +484,14 @@ static void xen_pt_unregister_regions(XenPCIPassthroughState *s)
     }
     if (d->rom.base_addr && d->rom.size) {
         memory_region_destroy(&s->rom);
+    }
+
+    if (gfx_passthru) {
+        uint16_t vendor = pci_get_word(s->dev.config + PCI_VENDOR_ID);
+        uint16_t class = pci_get_word(s->dev.config + PCI_CLASS_DEVICE);
+
+        if (vendor == PCI_VENDOR_ID_INTEL && class == PCI_CLASS_DISPLAY_VGA)
+            unregister_vga_regions(&s->dev);
     }
 }
 

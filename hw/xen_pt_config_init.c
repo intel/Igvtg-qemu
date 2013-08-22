@@ -1438,6 +1438,37 @@ static XenPTRegInfo xen_pt_emu_reg_msix[] = {
     },
 };
 
+static int xen_pt_intel_opregion_read(XenPCIPassthroughState *s,
+		XenPTReg *cfg_entry,
+		uint32_t *value, uint32_t valid_mask)
+{
+	*value = igd_read_opregion(&s->real_device);
+	return 0;
+}
+
+static int xen_pt_intel_opregion_write(XenPCIPassthroughState *s,
+		XenPTReg *cfg_entry,
+		uint32_t *value, uint32_t dev_value,
+		uint32_t valid_mask)
+{
+	igd_write_opregion(&s->real_device, *value);
+	return 0;
+}
+
+static XenPTRegInfo xen_pt_emu_reg_igd_opregion[] = {
+    /* Intel IGFX OpRegion reg */
+    {
+        .offset     = 0x0,
+        .size       = 4,
+        .init_val   = 0,
+        .no_wb      = 1,
+        .u.dw.read   = xen_pt_intel_opregion_read,
+        .u.dw.write  = xen_pt_intel_opregion_write,
+    },
+    {
+        .size = 0,
+    },
+};
 
 /****************************
  * Capabilities
@@ -1675,6 +1706,14 @@ static const XenPTRegGroupInfo xen_pt_emu_reg_grps[] = {
         .size_init   = xen_pt_msix_size_init,
         .emu_regs = xen_pt_emu_reg_msix,
     },
+    /* Intel IGD Opregion group */
+    {
+        .grp_id      = PCI_INTEL_OPREGION,
+        .grp_type    = XEN_PT_GRP_TYPE_EMU,
+        .grp_size    = 0x4,
+        .size_init   = xen_pt_reg_grp_size_init,
+        .emu_regs = xen_pt_emu_reg_igd_opregion,
+    },
     {
         .grp_size = 0,
     },
@@ -1796,6 +1835,10 @@ static int xen_pt_config_reg_init(XenPCIPassthroughState *s,
 
 int xen_pt_config_init(XenPCIPassthroughState *s)
 {
+    uint16_t vendor = pci_get_word(s->dev.config + PCI_VENDOR_ID);
+    uint16_t class = pci_get_word(s->dev.config + PCI_CLASS_DEVICE);
+    int igd_device = !!(vendor == PCI_VENDOR_ID_INTEL && class == PCI_CLASS_DISPLAY_VGA);
+
     int i, rc;
 
     QLIST_INIT(&s->reg_grps);
@@ -1803,8 +1846,15 @@ int xen_pt_config_init(XenPCIPassthroughState *s)
     for (i = 0; xen_pt_emu_reg_grps[i].grp_size != 0; i++) {
         uint32_t reg_grp_offset = 0;
         XenPTRegGroup *reg_grp_entry = NULL;
+        /*
+         * Due to the limitation of XEN PT PCI configuration
+         * emulation routines: assuming the offset of special group
+         * 0xff is always 0. We have to open a new group and add
+         * a small workaround here for OPREGION emulation.
+         */
+        if (xen_pt_emu_reg_grps[i].grp_id != 0xFF
+                && xen_pt_emu_reg_grps[i].grp_id != PCI_INTEL_OPREGION) {
 
-        if (xen_pt_emu_reg_grps[i].grp_id != 0xFF) {
             if (xen_pt_hide_dev_cap(&s->real_device,
                                     xen_pt_emu_reg_grps[i].grp_id)) {
                 continue;
@@ -1815,6 +1865,16 @@ int xen_pt_config_init(XenPCIPassthroughState *s)
             if (!reg_grp_offset) {
                 continue;
             }
+        }
+
+        if (xen_pt_emu_reg_grps[i].grp_id == PCI_INTEL_OPREGION) {
+            /*
+             * Do not emulate OPREGION on non-IGD device.
+             */
+            if (!igd_device)
+                continue;
+
+            reg_grp_offset = PCI_INTEL_OPREGION;
         }
 
         reg_grp_entry = g_new0(XenPTRegGroup, 1);

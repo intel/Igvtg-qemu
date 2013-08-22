@@ -124,6 +124,7 @@ int main(int argc, char **argv)
 #include "hw/watchdog.h"
 #include "hw/smbios.h"
 #include "hw/xen.h"
+#include "hw/xen_pt.h"
 #include "hw/qdev.h"
 #include "hw/loader.h"
 #include "bt-host.h"
@@ -153,7 +154,6 @@ int main(int argc, char **argv)
 #include "fsdev/qemu-fsdev.h"
 #endif
 #include "qtest.h"
-
 #include "disas.h"
 
 #include "qemu_socket.h"
@@ -3522,6 +3522,9 @@ int main(int argc, char **argv, char **envp)
             case QEMU_OPTION_object:
                 opts = qemu_opts_parse(qemu_find_opts("object"), optarg, 1);
                 break;
+            case QEMU_OPTION_gfx_passthru:
+                gfx_passthru = 1;
+                break;
             case QEMU_OPTION_vgt_low_gm_sz:
                 {
                     extern int vgt_low_gm_sz;
@@ -3567,6 +3570,11 @@ int main(int argc, char **argv, char **envp)
         exit(1);
     }
 #endif
+
+    if (xengt_vga_enabled && gfx_passthru) {
+        fprintf(stderr, "Cannot enable XENGT and VTD at the same time.\n");
+        exit(1);
+    }
 
     if (machine == NULL) {
         fprintf(stderr, "No machine found.\n");

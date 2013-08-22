@@ -298,5 +298,22 @@ static inline bool xen_pt_has_msix_mapping(XenPCIPassthroughState *s, int bar)
     return s->msix && s->msix->bar_index == bar;
 }
 
+extern int gfx_passthru;
+
+uint32_t igd_read_opregion(struct XenHostPCIDevice *dev);
+
+void igd_write_opregion(struct XenHostPCIDevice *dev, uint32_t val);
+
+uint32_t igd_pci_read(PCIDevice *pci_dev, uint32_t config_addr, int len);
+
+void igd_pci_write(PCIDevice *pci_dev, uint32_t config_addr, uint32_t val, int len);
+
+void intel_pch_init(PCIBus *bus);
+
+int setup_vga_pt(struct PCIDevice *dev);
+
+int register_vga_regions(struct PCIDevice *dev);
+
+int unregister_vga_regions(struct PCIDevice *dev);
 
 #endif /* !XEN_PT_H */
