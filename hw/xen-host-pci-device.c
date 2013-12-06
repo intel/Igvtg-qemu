@@ -383,6 +383,11 @@ int xen_host_pci_device_get(XenHostPCIDevice *d, uint16_t domain,
         goto error;
     }
 
+    rc = xen_host_pci_get_word(d, 0x0a, &d->class_code);
+    if (rc) {
+        goto error;
+    }
+
     return 0;
 error:
     if (d->config_fd >= 0) {

@@ -301,6 +301,7 @@ DeviceState *xengt_vga_init(PCIBus *pci_bus)
     pci_config_set_vendor_id(dev->config, host_dev.vendor_id);
     pci_config_set_device_id(dev->config, host_dev.device_id);
     pci_config_set_revision(dev->config, host_dev.revision_id);
+    pci_config_set_class(dev->config, host_dev.class_code);
     br = DO_UPCAST(PCIBridge, dev, dev);
     pci_bridge_map_irq(br, "IGD Bridge",
                        pch_map_irq);
