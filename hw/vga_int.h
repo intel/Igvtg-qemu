@@ -45,6 +45,7 @@
 #define VBE_DISPI_INDEX_Y_OFFSET        0x9
 #define VBE_DISPI_INDEX_NB              0xa /* size of vbe_regs[] */
 #define VBE_DISPI_INDEX_VIDEO_MEMORY_64K 0xa /* read-only, not in vbe_regs */
+#define VBE_DISPI_INDEX_LFB_ADDRESS_H    0xb
 
 #define VBE_DISPI_ID0                   0xB0C0
 #define VBE_DISPI_ID1                   0xB0C1

@@ -618,7 +618,14 @@ uint32_t vbe_ioport_read_data(void *opaque, uint32_t addr)
     } else if (s->vbe_index == VBE_DISPI_INDEX_VIDEO_MEMORY_64K) {
         val = s->vram_size / (64 * 1024);
     } else {
-        val = 0;
+        switch (s->vbe_index) {
+            case VBE_DISPI_INDEX_LFB_ADDRESS_H:
+                val = VBE_DISPI_LFB_PHYSICAL_ADDRESS >> 16;
+                break;
+            default:
+                val = 0;
+                break;
+        }
     }
 #ifdef DEBUG_BOCHS_VBE
     printf("VBE: read index=0x%x val=0x%x\n", s->vbe_index, val);
