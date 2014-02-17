@@ -100,9 +100,8 @@ static void create_vgt_instance(void)
 static void destroy_vgt_instance(void)
 {
     const char *path = "/sys/kernel/vgt/control/create_vgt_instance";
-    FILE *vgt_file, *shell_output;
+    FILE *vgt_file;
     int err = 0;
-    int tmp, fast_switch = 0;
 
     qemu_log("vGT: %s: domid=%d\n", __func__, xen_domid);
 
@@ -110,22 +109,6 @@ static void destroy_vgt_instance(void)
         fprintf(stdout, "vGT: open %s failed\n", path);
         err = errno;
     }
-
-    shell_output = popen("(cat /sys/kernel/vgt/control/display_switch_method "
-        "2>/dev/null | grep -q 'using the fast-path method') "
-        "&& echo 0xdeadbeaf", "r");
-    if (shell_output != NULL && fscanf(shell_output, "%x", &tmp) == 1 &&
-            tmp == 0xdeadbeaf)
-        fast_switch = 1;
-    fprintf(stderr, "vGT: the vgt driver is using %s display switch\n",
-        fast_switch ? "fast" : "slow");
-    if (shell_output != NULL)
-        pclose(shell_output);
-
-    //use the slow method temperarily to workaround the issue "win7 shutdown
-    //makes the SNB laptop's LVDS screen always black.
-    if (fast_switch)
-        system("echo 0 > /sys/kernel/vgt/control/display_switch_method");
 
     /* -domid means we want the vgt driver to free the vgt instance
      * of Domain domid.
@@ -135,10 +118,6 @@ static void destroy_vgt_instance(void)
 
     if (!err && fclose(vgt_file) != 0)
         err = errno;
-
-    //restore to the fast method
-    if (fast_switch)
-        system("echo 1 > /sys/kernel/vgt/control/display_switch_method");
 
     if (err) {
         qemu_log("vGT: %s: failed: errno=%d\n", __func__, err);
