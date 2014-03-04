@@ -479,6 +479,7 @@ extern ram_addr_t ram_size;
 extern int vgt_low_gm_sz;
 extern int vgt_high_gm_sz;
 extern int vgt_fence_sz;
+extern const char *vgt_monitor_config_file;
 
 /* RAM is pre-allocated and passed into qemu_ram_alloc_from_ptr */
 #define RAM_PREALLOC_MASK   (1 << 0)

@@ -46,11 +46,242 @@ typedef struct VGTVGAState {
     bool instance_created;
 } VGTVGAState;
 
+#define EDID_SIZE 128
+#define MAX_INPUT_NUM 3
+#define MAX_PORT_TYPE 4
+#define MAX_FILE_NAME_LENGTH 128
+
+typedef struct VGTMonitorInfo {
+    unsigned char port_type;
+    unsigned char port_override;
+    unsigned char edid[EDID_SIZE];
+}VGTMonitorInfo_t;
+
 /* These are the default values */
 int vgt_low_gm_sz = 64; /* in MB */
 int vgt_high_gm_sz = 448; /* in MB */
 int vgt_fence_sz = 4;
 int vgt_primary = 1; /* -1 means "not specified */
+const char *vgt_monitor_config_file = NULL;
+
+static bool validate_monitor_configs(VGTMonitorInfo_t *config)
+{
+    if (config->port_type > MAX_PORT_TYPE) {
+        qemu_log("vGT: %s failed because the invalid port_type input: %d!\n",
+            __func__, config->port_type);
+        return false;
+    }
+    if (config->port_override > MAX_PORT_TYPE) {
+        qemu_log("vGT: %s failed because the invalid port_override input: %d!\n",
+            __func__, config->port_override);
+        return false;
+    }
+    if (config->edid[126] != 0) {
+        qemu_log("vGT: %s failed because there is extended block in EDID! "
+            "(EDID[126] is not zero)\n", __func__);
+        return false;
+    }
+
+    return true;
+}
+
+static void config_hvm_monitors(VGTMonitorInfo_t *config)
+{
+    const char *path_prefix = "/sys/kernel/vgt/vm";
+    FILE *fp;
+    char file_name[MAX_FILE_NAME_LENGTH];
+    int ret;
+
+    // override
+    snprintf(file_name, MAX_FILE_NAME_LENGTH, "%s%d/PORT_%c/port_override",
+        path_prefix, xen_domid, 'A' + config->port_type);
+    if ((fp = fopen(file_name, "w")) == NULL) {
+        qemu_log("vGT: %s failed to open file %s! errno = %d\n",
+            __func__, file_name, errno);
+        return;
+    }
+    fprintf(fp, "PORT_%c", 'A' + config->port_override);
+    if (fclose(fp) != 0)
+        qemu_log("vGT: %s failed to close file: errno = %d\n", __func__, errno);
+
+    // edid
+    snprintf(file_name, MAX_FILE_NAME_LENGTH, "%s%d/PORT_%c/edid",
+        path_prefix, xen_domid, 'A' + config->port_type);
+    if ((fp = fopen(file_name, "w")) == NULL) {
+        qemu_log("vGT: %s failed to open file %s! errno = %d\n",
+            __func__, file_name, errno);
+        return;
+    }
+    ret = fwrite(config->edid, 1, EDID_SIZE, fp);
+    if (ret != EDID_SIZE) {
+        qemu_log("vGT: %s failed to write EDID with returned size %d: errno = %d\n",
+            __func__, ret, errno);
+    }
+    if (fclose(fp) != 0)
+        qemu_log("vGT: %s failed to close file: errno = %d\n", __func__, errno);
+
+    // flush result to port structure
+    snprintf(file_name, MAX_FILE_NAME_LENGTH, "%s%d/PORT_%c/connection",
+        path_prefix, xen_domid, 'A' + config->port_type);
+    if ((fp = fopen(file_name, "w")) == NULL) {
+        qemu_log("vGT: %s failed to open file %s! errno = %d\n",
+            __func__, file_name, errno);
+        return;
+    }
+    fprintf(fp, "flush");
+    if (fclose(fp) != 0)
+        qemu_log("vGT: %s failed to close file: errno = %d\n", __func__, errno);
+}
+
+#define CTOI(chr) \
+    (chr >= '0' && chr <= '9' ? chr - '0' : \
+    (chr >= 'a' && chr <= 'f' ? chr - 'a' + 10 :\
+    (chr >= 'A' && chr <= 'F' ? chr - 'A' + 10 : -1)))
+
+static int get_byte_from_txt_file(FILE *file, const char *file_name)
+{
+    int i;
+    int val[2];
+
+    for (i = 0; i < 2; ++ i) {
+        do {
+            unsigned char buf;
+            if (fread(&buf, 1, 1, file) != 1) {
+                qemu_log("vGT: %s failed to get byte from text file %s with errno: %d!\n",
+                    __func__, file_name, errno);
+                return -1;
+            }
+
+            if (buf == '#') {
+                // ignore comments
+                int ret;
+                while (((ret = fread(&buf, 1, 1, file)) == 1) && (buf != '\n')) ;
+                if (ret != 1) {
+                    qemu_log("vGT: %s failed to proceed after comment string "
+                            "from text file %s with errno: %d!\n",
+                            __func__, file_name, errno);
+                    return -1;
+                }
+            }
+
+            val[i] = CTOI(buf);
+        } while(val[i] == -1);
+    }
+
+    return ((val[0] << 4) | val[1]);
+}
+
+static int get_config_header(unsigned char *buf, FILE *file, const char *file_name)
+{
+    int ret;
+    unsigned char chr;
+
+    if (fread(&chr, 1, 1, file) != 1) {
+        qemu_log("vGT: %s failed to get byte from text file %s with errno: %d!\n",
+            __func__, file_name, errno);
+        return -1;
+    }
+
+    if (chr == '#') {
+        // it is text format input.
+        while (((ret = fread(&chr, 1, 1, file)) == 1) && (chr != '\n')) ;
+        if (ret != 1) {
+            qemu_log("vGT: %s failed to proceed after comment string "
+                "from file %s with errno: %d!\n",
+                __func__, file_name, errno);
+            return -1;
+        }
+        ret = get_byte_from_txt_file(file, file_name);
+        buf[0] = 1;
+        buf[1] = (ret & 0xf);
+    } else {
+        if ((ret = fread(&buf[0], 1, 2, file)) != 2) {
+            qemu_log("vGT: %s failed to read file %s! "
+                "Expect to read %d bytes but only got %d bytes! errno: %d\n",
+                __func__, file_name, 2, ret, errno);
+            return -1;
+        }
+
+        if (buf[0] != 0) {
+            // it is text format input.
+            buf[1] -= '0';
+        }
+    }
+
+    return 0;
+}
+
+static void config_vgt_guest_monitors(void)
+{
+    FILE *monitor_config_f;
+    unsigned char buf[4];
+    VGTMonitorInfo_t monitor_configs[MAX_INPUT_NUM];
+    bool text_mode;
+    int input_items;
+    int ret, i;
+
+    if (!vgt_monitor_config_file)
+        return;
+
+    if ((monitor_config_f = fopen(vgt_monitor_config_file, "r")) == NULL) {
+        qemu_log("vGT: %s failed to open file %s! errno = %d\n",
+            __func__, vgt_monitor_config_file, errno);
+        return;
+    }
+
+    if (get_config_header(buf, monitor_config_f, vgt_monitor_config_file) != 0)
+        goto finish_config;
+
+    text_mode = !!buf[0];
+    input_items = buf[1];
+
+    if (input_items <= 0 || input_items > MAX_INPUT_NUM) {
+        qemu_log("vGT: %s, Out of range input of the number of items! "
+            "Should be [1 - 3] but input is %d\n", __func__, input_items);
+        goto finish_config;
+    }
+
+    if (text_mode) {
+        unsigned int total = sizeof(VGTMonitorInfo_t) * input_items;
+        unsigned char *p = (unsigned char *)monitor_configs;
+        for (i = 0; i < total; ++i, ++p) {
+            unsigned int val = get_byte_from_txt_file(monitor_config_f, vgt_monitor_config_file);
+            if (val == -1)
+                break;
+            else
+                *p = val;
+        }
+        if (i < total)
+            goto finish_config;
+    } else {
+        unsigned int total = sizeof(VGTMonitorInfo_t) * input_items;
+        ret = fread(monitor_configs, sizeof(VGTMonitorInfo_t), input_items,
+                    monitor_config_f);
+        if (ret != total) {
+            qemu_log("vGT: %s failed to read file %s! "
+                "Expect to read %d bytes but only got %d bytes! errno: %d\n",
+                 __func__, vgt_monitor_config_file, total, ret, errno);
+            goto finish_config;
+        }
+    }
+
+    for (i = 0; i < input_items; ++ i) {
+        if (validate_monitor_configs(&monitor_configs[i]) == false) {
+            qemu_log("vGT: %s the monitor config[%d] input from %s is not valid!\n",
+                __func__, i, vgt_monitor_config_file);
+            goto finish_config;
+        }
+    }
+    for (i = 0; i < input_items; ++ i) {
+        config_hvm_monitors(&monitor_configs[i]);
+    }
+
+finish_config:
+    if (fclose(monitor_config_f) != 0)
+        qemu_log("vGT: %s failed to close file %s: errno = %d\n", __func__,
+		vgt_monitor_config_file, errno);
+    return;
+}
 
 /*
  *  Inform vGT driver to create a vGT instance
@@ -92,6 +323,8 @@ static void create_vgt_instance(void)
         qemu_log("vGT: %s failed: errno=%d\n", __func__, err);
         exit(-1);
     }
+
+    config_vgt_guest_monitors();
 }
 
 /*
@@ -154,7 +387,6 @@ void vgt_bridge_pci_write(PCIDevice *dev, uint32_t addr, uint32_t val, int len)
 static void vgt_bridge_pci_conf_init_from_host(PCIDevice *dev,
         uint32_t addr, int len)
 {
-    VGTVGAState *o = DO_UPCAST(VGTVGAState, dev, dev);
     XenHostPCIDevice host_dev;
 
     if(len > 4){
@@ -169,7 +401,6 @@ static void vgt_bridge_pci_conf_init_from_host(PCIDevice *dev,
     if( xen_host_pci_device_get(&host_dev, 0, 0, 0, 0) < 0)
     {
         fprintf(stderr, " Error, failed to get host PCI device\n");
-        return NULL;
     }
 
     xen_host_pci_get_block(&host_dev, addr, dev->config + addr, len);

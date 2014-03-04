@@ -3545,6 +3545,13 @@ int main(int argc, char **argv, char **envp)
                     char *ptr;
                     vgt_fence_sz = strtol(optarg,&ptr,10);
                 }
+                break;
+            case QEMU_OPTION_vgt_monitor_config_file:
+                {
+                    extern const char *vgt_monitor_config_file;
+                    vgt_monitor_config_file = optarg;
+                }
+                break;
             default:
                 os_parse_cmd_args(popt->index, optarg);
             }

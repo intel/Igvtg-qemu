@@ -1074,6 +1074,15 @@ STEXI
 Set the allocated aperture size.
 ETEXI
 
+DEF("vgt_monitor_config_file", HAS_ARG, QEMU_OPTION_vgt_monitor_config_file,
+    "-vgt_monitor_config_file file Use 'file' to config monitor while creating vgt instance.\n",
+    QEMU_ARCH_ALL)
+STEXI
+@item -vgt_monitor_config_file @var{file}
+@findex -vgt_monitor_config_file
+Use @var{file} to config monitor while creating vgt instance.
+ETEXI
+
 DEF("full-screen", 0, QEMU_OPTION_full_screen,
     "-full-screen    start in full screen\n", QEMU_ARCH_ALL)
 STEXI
