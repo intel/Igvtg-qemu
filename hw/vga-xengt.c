@@ -420,11 +420,12 @@ static void vgt_bridge_pci_conf_init_from_host(PCIDevice *dev,
 
 static void vgt_host_bridge_cap_init(PCIDevice *dev)
 {
-    vgt_vga_state_t *o = DO_UPCAST(vgt_vga_state_t, dev, dev);
     assert(dev->devfn == 0x00);
-    uint8_t cap_ptr;
+    uint8_t cap_ptr = 0;
+    XenHostPCIDevice host_dev;
 
-    xen_host_pci_get_byte(&o->host_dev, 0x34, &cap_ptr);
+    xen_host_pci_device_get(&host_dev, 0, 0, 0, 0);
+    xen_host_pci_get_byte(&host_dev, 0x34, &cap_ptr);
 
     while (cap_ptr !=0) {
         vgt_bridge_pci_conf_init_from_host(dev, cap_ptr, 4); /* capability */
@@ -433,8 +434,10 @@ static void vgt_host_bridge_cap_init(PCIDevice *dev)
         vgt_bridge_pci_conf_init_from_host(dev, cap_ptr + 12, 4); /* capability */
         //XEN_PT_LOG(pci_dev, "Add vgt host bridge capability: offset=0x%x, cap=0x%x\n", cap_ptr,
         //    pt_pci_host_read(0, PCI_SLOT(pci_dev->devfn), 0, cap_ptr, 1) & 0xFF );
-        xen_host_pci_get_byte(&o->host_dev, cap_ptr + 1, &cap_ptr);
+        xen_host_pci_get_byte(&host_dev, cap_ptr + 1, &cap_ptr);
     }
+
+    xen_host_pci_device_put(&host_dev);
 }
 
 
