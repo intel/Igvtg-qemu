@@ -48,11 +48,21 @@ typedef struct vgt_vga_state {
 
 #define EDID_SIZE 128
 #define MAX_INPUT_NUM 3
-#define MAX_PORT_TYPE 4
 #define MAX_FILE_NAME_LENGTH 128
 
+/* port definition must align with gvt-g driver */
+enum vgt_port {
+    PORT_A = 0,
+    PORT_B,
+    PORT_C,
+    PORT_D,
+    PORT_E,
+    MAX_PORTS
+};
+
 typedef struct vgt_monitor_info {
-    unsigned char port_type;
+    unsigned char port_type:4;
+    unsigned char port_is_dp:4;  /* 0 = HDMI PORT, 1 = DP port, only valid for PORT_B/C/D */
     unsigned char port_override;
     unsigned char edid[EDID_SIZE];
 }vgt_monitor_info_t;
@@ -64,14 +74,54 @@ int vgt_fence_sz = 4;
 int vgt_primary = 1; /* -1 means "not specified */
 const char *vgt_monitor_config_file = NULL;
 
+
+static inline unsigned int port_info_to_type(unsigned char port_is_dp, int port)
+{
+    /* port type definition must align with gvt-g driver */
+    enum vgt_port_type {
+        VGT_CRT = 0,
+        VGT_DP_A,
+        VGT_DP_B,
+        VGT_DP_C,
+        VGT_DP_D,
+        VGT_HDMI_B,
+        VGT_HDMI_C,
+        VGT_HDMI_D,
+        VGT_PORT_TYPE_MAX
+    } ret;
+
+    switch (port) {
+        case PORT_A:
+            ret = VGT_DP_A;
+            break;
+        case PORT_B:
+            ret = (port_is_dp) ? VGT_DP_B : VGT_HDMI_B;
+            break;
+        case PORT_C:
+            ret = (port_is_dp) ? VGT_DP_C : VGT_HDMI_C;
+            break;
+        case PORT_D:
+            ret = (port_is_dp) ? VGT_DP_D : VGT_HDMI_D;
+            break;
+	case PORT_E:
+            ret = VGT_CRT;
+            break;
+        default:
+            ret = VGT_PORT_TYPE_MAX;
+            break;
+    }
+
+    return ret;
+}
+
 static bool validate_monitor_configs(vgt_monitor_info_t *config)
 {
-    if (config->port_type > MAX_PORT_TYPE) {
+    if (config->port_type >= MAX_PORTS) {
         qemu_log("vGT: %s failed because the invalid port_type input: %d!\n",
             __func__, config->port_type);
         return false;
     }
-    if (config->port_override > MAX_PORT_TYPE) {
+    if (config->port_override >= MAX_PORTS) {
         qemu_log("vGT: %s failed due to the invalid port_override input: %d!\n",
             __func__, config->port_override);
         return false;
@@ -101,6 +151,19 @@ static void config_hvm_monitors(vgt_monitor_info_t *config)
         return;
     }
     fprintf(fp, "PORT_%c", 'A' + config->port_override);
+    if (fclose(fp) != 0) {
+        qemu_log("vGT: %s failed to close file: errno = %d\n", __func__, errno);
+    }
+
+    // type
+    snprintf(file_name, MAX_FILE_NAME_LENGTH, "%s%d/PORT_%c/type",
+        path_prefix, xen_domid, 'A' + config->port_type);
+    if ((fp = fopen(file_name, "w")) == NULL) {
+        qemu_log("vGT: %s failed to open file %s! errno = %d\n",
+            __func__, file_name, errno);
+        return;
+    }
+    fprintf(fp, "%d", port_info_to_type(config->port_is_dp, config->port_type));
     if (fclose(fp) != 0) {
         qemu_log("vGT: %s failed to close file: errno = %d\n", __func__, errno);
     }
