@@ -807,6 +807,13 @@ static PCIDevice *do_pci_register_device(PCIDevice *pci_dev, PCIBus *bus,
     if (devfn < 0) {
         for(devfn = bus->devfn_min ; devfn < ARRAY_SIZE(bus->devices);
             devfn += PCI_FUNC_MAX) {
+            /* If VGT enabled, reserve 00:02.* for IGD */
+            if (vgt_enabled && devfn == 0x10) {
+                JDPRINT("reserving devfn 0x10 for IGD\n");
+                JDPRINT("name -> %s\n", name);
+                continue;
+            }
+
             if (!bus->devices[devfn])
                 goto found;
         }
@@ -839,6 +846,7 @@ static PCIDevice *do_pci_register_device(PCIDevice *pci_dev, PCIBus *bus,
     pci_dev->irq_state = 0;
     pci_config_alloc(pci_dev);
 
+    JDPRINT("set vendor id(%x) for devfn(%x)\n", pc->vendor_id, devfn);
     pci_config_set_vendor_id(pci_dev->config, pc->vendor_id);
     pci_config_set_device_id(pci_dev->config, pc->device_id);
     pci_config_set_revision(pci_dev->config, pc->revision);

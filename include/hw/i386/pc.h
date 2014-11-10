@@ -162,6 +162,8 @@ extern int no_hpet;
 struct PCII440FXState;
 typedef struct PCII440FXState PCII440FXState;
 
+void i440fx_write_config(PCIDevice *dev,
+                                uint32_t address, uint32_t val, int len);
 PCIBus *i440fx_init(PCII440FXState **pi440fx_state, int *piix_devfn,
                     ISABus **isa_bus, qemu_irq *pic,
                     MemoryRegion *address_space_mem,

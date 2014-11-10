@@ -35,6 +35,8 @@
 #include "hw/i386/ioapic.h"
 #include "qapi/visitor.h"
 
+#include "hw/display/vga-vgt.h"
+
 /*
  * I440FX chipset data sheet.
  * http://download.intel.com/design/chipsets/datashts/29054901.pdf
@@ -155,8 +157,7 @@ static void i440fx_set_smm(int val, void *arg)
     memory_region_transaction_commit();
 }
 
-
-static void i440fx_write_config(PCIDevice *dev,
+void i440fx_write_config(PCIDevice *dev,
                                 uint32_t address, uint32_t val, int len)
 {
     PCII440FXState *d = I440FX_PCI_DEVICE(dev);
@@ -695,6 +696,10 @@ static void i440fx_class_init(ObjectClass *klass, void *data)
     dc->desc = "Host bridge";
     dc->no_user = 1;
     dc->vmsd = &vmstate_i440fx;
+    if (vgt_enabled) {
+        k->config_read = vgt_pci_read;
+	k->config_write = vgt_pci_write;
+    }
 }
 
 static const TypeInfo i440fx_info = {

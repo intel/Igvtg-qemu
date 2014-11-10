@@ -50,6 +50,8 @@
 #  include <xen/hvm/hvm_info_table.h>
 #endif
 
+#include "hw/display/vga-vgt.h"
+
 #define MAX_IDE_BUS 2
 
 static const int ide_iobase[MAX_IDE_BUS] = { 0x1f0, 0x170 };
@@ -108,10 +110,17 @@ static void pc_init1(MemoryRegion *system_memory,
         kvmclock_create();
     }
 
+#if 0
     if (ram_size >= 0xe0000000 ) {
         above_4g_mem_size = ram_size - 0xe0000000;
         below_4g_mem_size = 0xe0000000;
     } else {
+#else
+    if (ram_size >= 0xc0000000) {
+        above_4g_mem_size = ram_size - 0xc0000000;
+        below_4g_mem_size = 0xc0000000;
+    } else {
+#endif
         above_4g_mem_size = 0;
         below_4g_mem_size = ram_size;
     }
@@ -180,7 +189,12 @@ static void pc_init1(MemoryRegion *system_memory,
 
     pc_register_ferr_irq(gsi[13]);
 
-    pc_vga_init(isa_bus, pci_enabled ? pci_bus : NULL);
+    if (vgt_enabled && pci_enabled) {
+        vgt_vga_init(pci_bus);
+        isa_create_simple(isa_bus, "isa-vga");
+    } else {
+        pc_vga_init(isa_bus, pci_enabled ? pci_bus : NULL);
+    }
 
     /* init basic PC hardware */
     pc_basic_device_init(isa_bus, gsi, &rtc_state, &floppy, xen_enabled());

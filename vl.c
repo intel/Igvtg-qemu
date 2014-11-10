@@ -171,6 +171,8 @@ int main(int argc, char **argv)
 #include "ui/qemu-spice.h"
 #include "qapi/string-input-visitor.h"
 
+#include "hw/i386/kvm/kvmgt.h"
+
 //#define DEBUG_NET
 //#define DEBUG_SLIRP
 
@@ -279,6 +281,8 @@ static int default_floppy = 1;
 static int default_cdrom = 1;
 static int default_sdcard = 1;
 static int default_vga = 1;
+
+int vgt = 0;
 
 static struct {
     const char *driver;
@@ -2167,6 +2171,13 @@ static void select_vgahw (const char *p)
             fprintf(stderr, "Error: standard VGA not available\n");
             exit(0);
         }
+    } else if (strstart(p, "vgt", &opts)) {
+        if (vgt) {
+            vga_interface_type = VGA_VGT;
+        } else {
+            fprintf(stderr, "Error: VGA is vgt, but no -vgt in cmdline!\n");
+            exit(0);
+        }
     } else if (strstart(p, "cirrus", &opts)) {
         if (cirrus_vga_available()) {
             vga_interface_type = VGA_CIRRUS;
@@ -3848,6 +3859,27 @@ int main(int argc, char **argv, char **envp)
                 if (!opts) {
                     exit(1);
                 }
+                break;
+            case QEMU_OPTION_vgt_low_gm_sz:
+                {
+                     char *ptr;
+                     vgt_low_gm_sz = strtol(optarg, &ptr, 10);
+                }
+                break;
+            case QEMU_OPTION_vgt_high_gm_sz:
+                {
+                    char *ptr;
+                    vgt_high_gm_sz = strtol(optarg, &ptr, 10);
+                }
+                break;
+            case QEMU_OPTION_vgt_fence_sz:
+                {
+                    char *ptr;
+                    vgt_fence_sz = strtol(optarg, &ptr, 10);
+                }
+                break;
+            case QEMU_OPTION_vgt:
+                vgt = 1;
                 break;
             case QEMU_OPTION_realtime:
                 opts = qemu_opts_parse(qemu_find_opts("realtime"), optarg, 0);

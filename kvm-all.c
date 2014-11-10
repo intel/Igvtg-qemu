@@ -35,6 +35,10 @@
 #include "qemu/event_notifier.h"
 #include "trace.h"
 
+#include "hw/i386/pc.h"
+#include "hw/i386/kvm/kvmgt.h"
+
+
 /* This check must be after config-host.h is included */
 #ifdef CONFIG_EVENTFD
 #include <sys/eventfd.h>
@@ -1333,6 +1337,22 @@ static int kvm_max_vcpus(KVMState *s)
     return 4;
 }
 
+void vgt_opregion_init(void)
+{
+    KVMState *s = kvm_state;
+    uint32_t host_opregion = host_dev_pci_read(0, 0, 2, 0, IGD_OPREGION, 4);
+    int ret;
+
+    ret = e820_add_entry(host_opregion & 0xfff, PAGE_SIZE * 2, E820_NVS);
+
+    /* Use the host physical address of opregion as the GPA */
+    ret = kvm_vm_ioctl(s, KVM_VGT_SET_OPREGION, &host_opregion);
+    if (ret < 0) {
+        JERROR("kvm_vm_ioctl KVM_VGT_SET_OPREGION failed: ret = %d\n", ret);
+        exit(1);
+    }
+}
+
 int kvm_init(void)
 {
     static const char upgrade_note[] =
@@ -1400,6 +1420,19 @@ int kvm_init(void)
         ret = s->vmfd;
         goto err;
     }
+
+    if (vgt) {
+        kvm_domid = kvm_vm_ioctl(s, KVM_GET_DOMID, 0);
+        if (kvm_domid <= 0) {
+            JERROR("KVM_GET_DOMID failed: %d\n", kvm_domid);
+            ret = kvm_domid;
+            goto err;
+        }
+    }
+
+#if 1
+    JDPRINT("kvm_domid is  %d\n", kvm_domid);
+#endif
 
     missing_cap = kvm_check_extension_list(s, kvm_required_capabilites);
     if (!missing_cap) {

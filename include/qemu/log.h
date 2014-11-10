@@ -181,4 +181,22 @@ int qemu_str_to_log_mask(const char *str);
  */
 void qemu_print_log_usage(FILE *f);
 
+/* Jike: debug macros */
+#define JERROR(fmt, ...) fprintf(stderr, "[jike] %s-%d: "fmt, __func__, __LINE__, ##__VA_ARGS__);
+/* for those have errno set */
+#define JPERROR(a)						\
+    do {							\
+        fprintf(stderr, "%s-%d: %s: %s\n",		\
+            __func__, __LINE__,		\
+            a, strerror(errno));		\
+    } while (0)
+
+#if 1
+#define JDPRINT JERROR
+#else
+#define JDPRINT(fmt, ...) do {} while (0)
+#endif
+
+
+
 #endif

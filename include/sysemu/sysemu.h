@@ -84,6 +84,8 @@ void qemu_savevm_state_cancel(void);
 uint64_t qemu_savevm_state_pending(QEMUFile *f, uint64_t max_size);
 int qemu_loadvm_state(QEMUFile *f);
 
+extern int vgt;
+
 /* SLIRP */
 void do_info_slirp(Monitor *mon);
 
@@ -100,11 +102,12 @@ typedef enum DisplayType
 extern int autostart;
 
 typedef enum {
-    VGA_NONE, VGA_STD, VGA_CIRRUS, VGA_VMWARE, VGA_XENFB, VGA_QXL,
+    VGA_NONE, VGA_STD, VGA_CIRRUS, VGA_VMWARE, VGA_XENFB, VGA_QXL, VGA_VGT
 } VGAInterfaceType;
 
 extern int vga_interface_type;
 #define xenfb_enabled (vga_interface_type == VGA_XENFB)
+#define vgt_enabled (vga_interface_type == VGA_VGT && vgt)
 
 extern int graphic_width;
 extern int graphic_height;
