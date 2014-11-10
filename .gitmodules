@@ -3,7 +3,7 @@
 	url = git://git.qemu.org/vgabios.git/
 [submodule "roms/seabios"]
 	path = roms/seabios
-	url = git://git.qemu.org/seabios.git/
+	url = git://vt-repo.sh.intel.com/seabios-kvmgt.git
 [submodule "roms/SLOF"]
 	path = roms/SLOF
 	url = git://git.qemu.org/SLOF.git
