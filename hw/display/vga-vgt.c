@@ -126,7 +126,7 @@ static void destroy_vgt_instance(void)
     shell_output = popen("(cat /sys/kernel/vgt/control/display_switch_method "
         "2>/dev/null | grep -q 'using the fast-path method') "
         "&& echo 0xdeadbeaf", "r");
-    if (shell_output != NULL && fscanf(shell_output, "%x", &tmp) == 1 &&
+    if (shell_output != NULL && fscanf(shell_output, "%d", &tmp) == 1 &&
             tmp == 0xdeadbeaf)
         fast_switch = 1;
     fprintf(stderr, "vGT: the vgt driver is using %s display switch\n",

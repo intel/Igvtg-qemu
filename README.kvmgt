@@ -61,7 +61,7 @@
 
 	add this to kernel cmdline:
 
-		intel_iommu=off xen_vgt.hvm_boot_foreground=1
+		intel_iommu=igfx_off xen_vgt.hvm_boot_foreground=1
 
 
 4. run kvmgt guest
