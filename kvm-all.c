@@ -1343,7 +1343,7 @@ void vgt_opregion_init(void)
     uint32_t host_opregion = host_dev_pci_read(0, 0, 2, 0, IGD_OPREGION, 4);
     int ret;
 
-    ret = e820_add_entry(host_opregion & 0xfff, PAGE_SIZE * 2, E820_NVS);
+    ret = e820_add_entry(host_opregion & ~0xfff, PAGE_SIZE * 2, E820_NVS);
 
     /* Use the host physical address of opregion as the GPA */
     ret = kvm_vm_ioctl(s, KVM_VGT_SET_OPREGION, &host_opregion);
