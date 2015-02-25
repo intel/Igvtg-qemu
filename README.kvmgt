@@ -67,6 +67,7 @@
 4. run kvmgt guest
 
 	# /path/to/qemu-system-x86_64 -bios /path/to/bios.bin			\
+		-enable-kvm							\
 		-M pc -smp 2 -cpu host -m 1024					\
 		-machine kernel_irqchip=on					\
 		-vgt -vga vgt							\
