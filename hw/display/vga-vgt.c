@@ -175,7 +175,7 @@ static void vgt_pci_conf_init_from_host(PCIDevice *dev,
     HostDevice host_dev = {
         .s = 0,
         .b = 0,
-        .d = 2,
+        .d = 0,
         .f = 0,
     };
 
