@@ -343,14 +343,14 @@ static void vgt_class_initfn(ObjectClass *klass, void *data)
 #endif
 }
 
-static TypeInfo vgt_info = {
+static TypeInfo igd_info = {
     .name          = "vgt-vga",
-    .parent        = TYPE_PCI_BRIDGE,
+    .parent        = TYPE_PCI_DEVICE,
     .instance_size = sizeof(VGTVGAState),
     .class_init    = vgt_class_initfn,
 };
 
-static TypeInfo isa_info = {
+static TypeInfo pch_info = {
     .name          = "vgt-isa",
     .parent        = TYPE_PCI_BRIDGE,
     .instance_size = sizeof(VGTVGAState),
@@ -358,8 +358,8 @@ static TypeInfo isa_info = {
 
 static void vgt_register_types(void)
 {
-    type_register_static(&vgt_info);
-    type_register_static(&isa_info);
+    type_register_static(&igd_info);
+    type_register_static(&pch_info);
 }
 
 type_init(vgt_register_types)
