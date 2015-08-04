@@ -142,6 +142,9 @@ enum {
 
 #define PCI_NUM_PINS 4 /* A-D */
 
+/* PCI intel IGD OPERGION */
+#define PCI_INTEL_OPREGION 0xfc
+
 /* Bits in cap_present field. */
 enum {
     QEMU_PCI_CAP_MSI = 0x1,

@@ -104,11 +104,14 @@ extern int autostart;
 
 typedef enum {
     VGA_NONE, VGA_STD, VGA_CIRRUS, VGA_VMWARE, VGA_XENFB, VGA_QXL,
-    VGA_TCX, VGA_CG3, VGA_DEVICE
+    VGA_TCX, VGA_CG3, VGA_DEVICE, VGA_VGT
 } VGAInterfaceType;
 
 extern int vga_interface_type;
 #define xenfb_enabled (vga_interface_type == VGA_XENFB)
+#define vgt_vga_enabled (vga_interface_type == VGA_VGT)
+extern int vgt;
+int get_guest_domid(void);
 
 extern int graphic_width;
 extern int graphic_height;

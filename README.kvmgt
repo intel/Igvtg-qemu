@@ -1,0 +1,75 @@
+0. get the source code
+
+	$ git clone git://github.com/01org/KVMGT-seabios
+	$ cd qemu-xen
+	$ git submodule update --init dtc
+	$ git submodule update --init roms/seabios
+
+
+
+1. configure qemu/seabios
+
+	$ ./configure --prefix=/root	\
+	--enable-kvm		\
+	--disable-xen		\
+	--enable-debug-info	\
+	--enable-debug		\
+	--enable-sdl		\
+	--enable-vhost-net	\
+	--disable-debug-tcg	\
+	--target-list=x86_64-softmmu
+
+
+
+
+2. make qemu/seabios
+
+	$ cd qemu-kvmgt
+	$ make -j8
+
+	$ cd roms/seabios
+	$ make -j8
+
+	$ cd qemu-kvmgt
+	# ln -sf `pwd`/x86_64-softmmu/qemu-system-x86_64 /path/to/qemu-system-x86_64
+	# ln -sf `pwd`/roms/seabios/out/bios.bin /path/to/bios.bin
+
+
+3. utilities
+
+	# apt-get install libvirt-bin uml-utilities bridge-utils
+
+	# cat /root/bin/qemu-ifup
+	#!/bin/sh
+	set -x
+
+	switch=virbr0
+
+	if [ -n "$1" ];then
+		tunctl -u `whoami` -t $1
+		ip link set $1 up
+		sleep 0.5s
+		brctl addif $switch $1
+		exit 0
+	else
+		echo "Error: no interface specified"
+		exit 1
+	fi
+
+
+4. run kvmgt host
+
+	add this to kernel cmdline:
+
+		intel_iommu=igfx_off i915.hvm_boot_foreground=1
+
+
+5. run kvmgt guest
+
+	# /path/to/qemu-system-x86_64 -bios /path/to/bios.bin			\
+		-enable-kvm							\
+		-M pc -smp 2 -cpu host -m 1024					\
+		-machine kernel_irqchip=on					\
+		-vgt -vga vgt							\
+		-vgt_low_gm_sz 128						\
+		{snip}

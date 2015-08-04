@@ -11,6 +11,9 @@ common-obj-y += keymaps.o console.o cursor.o qemu-pixman.o
 common-obj-y += input.o input-keymap.o input-legacy.o
 common-obj-$(CONFIG_SPICE) += spice-core.o spice-input.o spice-display.o
 common-obj-$(CONFIG_SDL) += sdl.mo x_keymap.o
+ifeq ($(CONFIG_SDL),y)
+common-obj-$(CONFIG_VGT) += intel_vgt.o
+endif
 common-obj-$(CONFIG_COCOA) += cocoa.o
 common-obj-$(CONFIG_CURSES) += curses.o
 common-obj-$(CONFIG_VNC) += $(vnc-obj-y)
@@ -23,5 +26,6 @@ ifeq ($(CONFIG_SDLABI),2.0)
 sdl.mo-objs := sdl2.o sdl2-input.o sdl2-2d.o
 endif
 sdl.mo-cflags := $(SDL_CFLAGS)
+intel_vgt.o-cflags := $(SDL_CFLAGS)
 
 gtk.o-cflags := $(GTK_CFLAGS) $(VTE_CFLAGS)

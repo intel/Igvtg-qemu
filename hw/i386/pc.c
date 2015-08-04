@@ -86,6 +86,10 @@ void pc_set_legacy_acpi_data_size(void)
     acpi_data_size = 0x10000;
 }
 
+#ifdef CONFIG_KVM
+extern uint32_t vgt_kvm_opregion_addr;
+#endif
+
 #define BIOS_CFG_IOPORT 0x510
 #define FW_CFG_ACPI_TABLES (FW_CFG_ARCH_LOCAL + 0)
 #define FW_CFG_SMBIOS_ENTRIES (FW_CFG_ARCH_LOCAL + 1)
@@ -1261,6 +1265,12 @@ FWCfgState *pc_memory_init(MachineState *machine,
                                     ram_above_4g);
         e820_add_entry(0x100000000ULL, above_4g_mem_size, E820_RAM);
     }
+
+#ifdef CONFIG_KVM
+    if (vgt_vga_enabled && kvm_enabled()) {
+        e820_add_entry(vgt_kvm_opregion_addr, VGT_OPREGION_SIZE, E820_RESERVED);
+    }
+#endif
 
     if (!guest_info->has_reserved_memory &&
         (machine->ram_slots ||

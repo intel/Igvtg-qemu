@@ -40,7 +40,7 @@ static DisplaySurface *surface;
 static SDL_Surface *real_screen;
 static SDL_Surface *guest_screen = NULL;
 static int gui_grab; /* if true, all keyboard/mouse events are grabbed */
-static int last_vm_running;
+int last_vm_running;
 static bool gui_saved_scaling;
 static int gui_saved_width;
 static int gui_saved_height;
@@ -60,6 +60,13 @@ static SDL_Cursor *guest_sprite = NULL;
 static SDL_PixelFormat host_format;
 static int scaling_active = 0;
 static Notifier mouse_mode_notifier;
+
+void sdl_update_caption(void);
+void handle_keydown(SDL_Event *ev);
+void handle_keyup(SDL_Event *ev);
+void handle_mousemotion(SDL_Event *ev);
+void handle_mousebutton(SDL_Event *ev);
+void handle_activation(SDL_Event *ev);
 
 #if 0
 #define DEBUG_SDL
@@ -349,7 +356,7 @@ static void sdl_process_key(SDL_KeyboardEvent *ev)
                                      ev->type == SDL_KEYDOWN);
 }
 
-static void sdl_update_caption(void)
+void sdl_update_caption(void)
 {
     char win_title[1024];
     char icon_title[1024];
@@ -545,7 +552,7 @@ static void toggle_full_screen(void)
     graphic_hw_update(NULL);
 }
 
-static void handle_keydown(SDL_Event *ev)
+void handle_keydown(SDL_Event *ev)
 {
     int mod_state;
     int keycode;
@@ -691,7 +698,7 @@ static void handle_keydown(SDL_Event *ev)
     }
 }
 
-static void handle_keyup(SDL_Event *ev)
+void handle_keyup(SDL_Event *ev)
 {
     int mod_state;
 
@@ -723,7 +730,7 @@ static void handle_keyup(SDL_Event *ev)
     }
 }
 
-static void handle_mousemotion(SDL_Event *ev)
+void handle_mousemotion(SDL_Event *ev)
 {
     int max_x, max_y;
 
@@ -747,7 +754,7 @@ static void handle_mousemotion(SDL_Event *ev)
     }
 }
 
-static void handle_mousebutton(SDL_Event *ev)
+void handle_mousebutton(SDL_Event *ev)
 {
     int buttonstate = SDL_GetMouseState(NULL, NULL);
     SDL_MouseButtonEvent *bev;
@@ -772,7 +779,7 @@ static void handle_mousebutton(SDL_Event *ev)
     }
 }
 
-static void handle_activation(SDL_Event *ev)
+void handle_activation(SDL_Event *ev)
 {
 #ifdef _WIN32
     /* Disable grab if the window no longer has the focus

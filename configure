@@ -255,6 +255,7 @@ attr=""
 libattr=""
 xfs=""
 
+vgt="yes"
 vhost_net="no"
 vhost_scsi="no"
 kvm="no"
@@ -829,6 +830,10 @@ for opt do
   ;;
   --with-sdlabi=*) sdlabi="$optarg"
   ;;
+  --disable-vgt) vgt="no"
+  ;;
+  --enable-vgt) vgt="yes"
+  ;;
   --disable-qom-cast-debug) qom_cast_debug="no"
   ;;
   --enable-qom-cast-debug) qom_cast_debug="yes"
@@ -1278,6 +1283,8 @@ Advanced options (experts only):
   --disable-sdl            disable SDL
   --enable-sdl             enable SDL
   --with-sdlabi            select preferred SDL ABI 1.2 or 2.0
+  --disable-vgt            disable Intel GVT-g technology
+  --enable-vgt             enable Intel VGT-g technology
   --disable-gtk            disable gtk UI
   --enable-gtk             enable gtk UI
   --with-gtkabi            select preferred GTK ABI 2.0 or 3.0
@@ -2251,6 +2258,28 @@ EOF
     sdl_libs="$sdl_libs $x11_libs"
   fi
   libs_softmmu="$sdl_libs $libs_softmmu"
+fi
+
+##########################################
+# Intel GVT-g detection
+if test "$vgt" = "yes" ; then
+  cat > $TMPC <<EOF
+#include <EGL/egl.h>
+int main(void) { return 0; }
+EOF
+  vgt="yes"
+  if test "$sdl" = "yes" ; then
+    vgt_cflags=`$pkg_config --cflags egl 2> /dev/null`
+    if compile_prog "$vgt_cflags" "" ; then
+      vgt_libs=`$pkg_config --libs libdrm gl egl libudev 2> /dev/null`
+      libs_softmmu="$vgt_libs $libs_softmmu"
+      QEMU_CFLAGS="$vgt_cflags $QEMU_CFLAGS"
+    else
+      error_exit "EGL library missed. Please EGL library first."
+    fi
+  else
+    echo "Intel VGT indirect display will be disabled due to SDL disabled!"
+  fi
 fi
 
 ##########################################
@@ -4358,6 +4387,7 @@ if test "$darwin" = "yes" ; then
 fi
 echo "pixman            $pixman"
 echo "SDL support       $sdl"
+echo "Intel GVT-g support $vgt"
 echo "GTK support       $gtk"
 echo "VTE support       $vte"
 echo "curses support    $curses"
@@ -4610,6 +4640,9 @@ if test "$sdl" = "yes" ; then
   echo "CONFIG_SDL=y" >> $config_host_mak
   echo "CONFIG_SDLABI=$sdlabi" >> $config_host_mak
   echo "SDL_CFLAGS=$sdl_cflags" >> $config_host_mak
+fi
+if test "$vgt" = "yes" ; then
+  echo "CONFIG_VGT=y" >> $config_host_mak
 fi
 if test "$cocoa" = "yes" ; then
   echo "CONFIG_COCOA=y" >> $config_host_mak

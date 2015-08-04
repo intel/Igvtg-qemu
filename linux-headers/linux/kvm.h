@@ -12,7 +12,7 @@
 #include <linux/ioctl.h>
 #include <asm/kvm.h>
 
-#define KVM_API_VERSION 12
+#define KVM_API_VERSION 100
 
 /* *** Deprecated interfaces *** */
 
@@ -1185,5 +1185,9 @@ struct kvm_assigned_msix_entry {
 	__u16 entry; /* The index of entry in the MSI-X table */
 	__u16 padding[3];
 };
+
+/* Jike: for KVMGT - let's start from 0x100 */
+#define KVM_GET_DOMID                   _IO(KVMIO, 0x100)
+#define KVM_VGT_SET_OPREGION       _IOW(KVMIO, 0x101, uint32_t)
 
 #endif /* __LINUX_KVM_H */

@@ -154,8 +154,8 @@ static void i440fx_set_smm(int val, void *arg)
 }
 
 
-static void i440fx_write_config(PCIDevice *dev,
-                                uint32_t address, uint32_t val, int len)
+void i440fx_write_config(PCIDevice *dev,
+                         uint32_t address, uint32_t val, int len)
 {
     PCII440FXState *d = I440FX_PCI_DEVICE(dev);
 
@@ -302,6 +302,10 @@ static void i440fx_realize(PCIDevice *dev, Error **errp)
     dev->config[I440FX_SMRAM] = 0x02;
 
     cpu_smm_register(&i440fx_set_smm, d);
+
+    if (vgt_vga_enabled && xen_enabled()) {
+        vgt_bridge_pci_conf_init(dev);
+    }
 }
 
 PCIBus *i440fx_init(PCII440FXState **pi440fx_state,

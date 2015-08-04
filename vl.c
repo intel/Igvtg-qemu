@@ -144,6 +144,7 @@ static int rtc_utc = 1;
 static int rtc_date_offset = -1; /* -1 means no change */
 QEMUClockType rtc_clock;
 int vga_interface_type = VGA_NONE;
+int vgt = 0;
 static int full_screen = 0;
 static int no_frame = 0;
 int no_quit = 0;
@@ -1884,6 +1885,15 @@ static void select_vgahw (const char *p)
             vga_interface_type = VGA_STD;
         } else {
             fprintf(stderr, "Error: standard VGA not available\n");
+            exit(0);
+        }
+    } else if (strstart(p, "xengt", &opts)) {
+        vga_interface_type = VGA_VGT;
+    } else if (strstart(p, "vgt", &opts)) {
+        if (vgt) {
+            vga_interface_type = VGA_VGT;
+        } else {
+            fprintf(stderr, "Error: VGA is vgt, but -vgt not specified!\n");
             exit(0);
         }
     } else if (strstart(p, "cirrus", &opts)) {
@@ -3753,6 +3763,34 @@ int main(int argc, char **argv, char **envp)
                     exit(1);
                 }
                 break;
+#ifdef CONFIG_VGT
+            case QEMU_OPTION_vgt_low_gm_sz:
+                {
+                    char *ptr;
+                    vgt_low_gm_sz = strtol(optarg, &ptr, 10);
+                }
+                break;
+            case QEMU_OPTION_vgt_high_gm_sz:
+                {
+                    char *ptr;
+                    vgt_high_gm_sz = strtol(optarg, &ptr, 10);
+                }
+                break;
+            case QEMU_OPTION_vgt_fence_sz:
+                {
+                    char *ptr;
+                    vgt_fence_sz = strtol(optarg, &ptr, 10);
+                }
+                break;
+            case QEMU_OPTION_vgt_monitor_config_file:
+                {
+                    vgt_monitor_config_file = optarg;
+                }
+                break;
+            case QEMU_OPTION_vgt:
+                vgt = 1;
+                break;
+#endif
             default:
                 os_parse_cmd_args(popt->index, optarg);
             }
@@ -4272,7 +4310,11 @@ int main(int argc, char **argv, char **envp)
 #endif
 #if defined(CONFIG_SDL)
     case DT_SDL:
-        sdl_display_init(ds, full_screen, no_frame);
+        if (vgt_vga_enabled && intel_vgt_check_composite_display()) {
+            intel_vgt_display_init(ds, full_screen, no_frame);
+        } else {
+            sdl_display_init(ds, full_screen, no_frame);
+        }
         break;
 #elif defined(CONFIG_COCOA)
     case DT_SDL:
