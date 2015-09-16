@@ -69,6 +69,6 @@ extern int vgt_low_gm_sz;
 extern int vgt_high_gm_sz;
 extern int vgt_fence_sz;
 
-void vgt_opregion_init(void);
+void vgt_opregion_init(MemoryRegion *opregion, ram_addr_t opregion_phys_addr);
 
 #endif /* _KVM_GT_ */

@@ -190,6 +190,7 @@ static void pc_init1(MemoryRegion *system_memory,
     pc_register_ferr_irq(gsi[13]);
 
     if (vgt_enabled && pci_enabled) {
+        vgt_opregion_reserve(system_memory, below_4g_mem_size);
         vgt_vga_init(pci_bus);
         isa_create_simple(isa_bus, "isa-vga");
     } else {
@@ -220,6 +221,9 @@ static void pc_init1(MemoryRegion *system_memory,
             idebus[i] = qdev_get_child_bus(DEVICE(dev), "ide.0");
         }
     }
+
+    if (vgt_enabled)
+        below_4g_mem_size -= OPREGION_SIZE;
 
     pc_cmos_init(below_4g_mem_size, above_4g_mem_size, boot_device,
                  floppy, idebus[0], idebus[1], rtc_state);

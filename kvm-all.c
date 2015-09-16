@@ -1337,16 +1337,11 @@ static int kvm_max_vcpus(KVMState *s)
     return 4;
 }
 
-void vgt_opregion_init(void)
+void vgt_opregion_init(MemoryRegion *opregion, ram_addr_t opregion_gpa)
 {
-    KVMState *s = kvm_state;
-    uint32_t host_opregion = host_dev_pci_read(0, 0, 2, 0, IGD_OPREGION, 4);
     int ret;
 
-    ret = e820_add_entry(host_opregion & ~0xfff, PAGE_SIZE * 2, E820_NVS);
-
-    /* Use the host physical address of opregion as the GPA */
-    ret = kvm_vm_ioctl(s, KVM_VGT_SET_OPREGION, &host_opregion);
+    ret = kvm_vm_ioctl(kvm_state, KVM_VGT_SET_OPREGION, &opregion_gpa);
     if (ret < 0) {
         JERROR("kvm_vm_ioctl KVM_VGT_SET_OPREGION failed: ret = %d\n", ret);
         exit(1);

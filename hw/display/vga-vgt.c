@@ -58,6 +58,8 @@ int vgt_primary = 1; /* -1 means "not specified */
 
 int kvm_domid = 1;
 extern uint32_t xen_domid;
+MemoryRegion *opregion = NULL;
+ram_addr_t opregion_gpa = 0;
 
 /*
  *  Inform vGT driver to create a vGT instance
@@ -339,7 +341,7 @@ static void vgt_class_initfn(ObjectClass *klass, void *data)
     dc->vmsd = &vmstate_vga_common;
 
 #ifdef CONFIG_KVM
-    vgt_opregion_init();
+    vgt_opregion_init(opregion, opregion_gpa);
 #endif
 }
 
@@ -349,6 +351,18 @@ static TypeInfo igd_info = {
     .instance_size = sizeof(VGTVGAState),
     .class_init    = vgt_class_initfn,
 };
+
+void vgt_opregion_reserve(MemoryRegion *system_memory, ram_addr_t tom_below_4g)
+{
+    opregion_gpa = (tom_below_4g - OPREGION_SIZE) & ~0xfff;
+
+    opregion = g_malloc(sizeof(*opregion));
+    memory_region_init_ram(opregion, NULL, "opregion.ram", OPREGION_SIZE);
+    vmstate_register_ram_global(opregion);
+    memory_region_add_subregion(system_memory, opregion_gpa, opregion);
+
+    e820_add_entry(opregion_gpa, OPREGION_SIZE, E820_NVS);
+}
 
 static TypeInfo pch_info = {
     .name          = "vgt-isa",
