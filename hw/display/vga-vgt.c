@@ -240,6 +240,13 @@ void vgt_pci_write(PCIDevice *pci_dev, uint32_t config_addr, uint32_t val, int l
 
 static void vgt_reset(DeviceState *dev)
 {
+    PCIDevice *pdev = DO_UPCAST(PCIDevice, qdev, dev);
+    VGTVGAState *d = DO_UPCAST(VGTVGAState, dev, pdev);
+
+    if (d->instance_created) {
+        destroy_vgt_instance();
+        create_vgt_instance();
+    }
 }
 
 static void vgt_cleanupfn(PCIDevice *dev)
