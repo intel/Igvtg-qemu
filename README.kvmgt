@@ -70,6 +70,6 @@
 		-enable-kvm							\
 		-M pc -smp 2 -cpu host -m 1024					\
 		-machine kernel_irqchip=on					\
-		-vgt -vga vgt							\
+		-vgt -vga vgt -vgt_low_gm_sz 128				\
 		{snip}
 
