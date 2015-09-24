@@ -368,7 +368,11 @@ void vgt_opregion_reserve(MemoryRegion *system_memory, ram_addr_t tom_below_4g)
     vmstate_register_ram_global(opregion);
     memory_region_add_subregion(system_memory, opregion_gpa, opregion);
 
+#if 0
     e820_add_entry(opregion_gpa, OPREGION_SIZE, E820_NVS);
+#else
+    e820_add_entry(opregion_gpa, OPREGION_SIZE, E820_RESERVED);
+#endif
 }
 
 static TypeInfo pch_info = {
