@@ -243,10 +243,10 @@ static void vgt_reset(DeviceState *dev)
     PCIDevice *pdev = DO_UPCAST(PCIDevice, qdev, dev);
     VGTVGAState *d = DO_UPCAST(VGTVGAState, dev, pdev);
 
-    if (d->instance_created) {
+    if (d->instance_created)
         destroy_vgt_instance();
-        create_vgt_instance();
-    }
+    create_vgt_instance();
+    d->instance_created = TRUE;
 }
 
 static void vgt_cleanupfn(PCIDevice *dev)
@@ -260,12 +260,6 @@ static void vgt_cleanupfn(PCIDevice *dev)
 
 static int vgt_initfn(PCIDevice *dev)
 {
-    VGTVGAState *d = DO_UPCAST(VGTVGAState, dev, dev);
-
-    JDPRINT("vgt_initfn\n");
-    d->instance_created = TRUE;
-
-    create_vgt_instance();
     return 0;
 }
 
