@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) Intel
+ *
+ * This work is licensed under the terms of the GNU GPL, version 2.  See
+ * the COPYING file in the top-level directory.
+ *
+ */
 #ifndef __VGT_H__
 #define __VGT_H__
 
