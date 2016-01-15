@@ -343,6 +343,7 @@ libattr=""
 xfs=""
 tcg="yes"
 membarrier=""
+vgt="yes"
 vhost_net="no"
 vhost_crypto="no"
 vhost_scsi="no"
@@ -973,6 +974,10 @@ for opt do
   ;;
   --with-sdlabi=*) sdlabi="$optarg"
   ;;
+  --disable-vgt) vgt="no"
+  ;;
+  --enable-vgt) vgt="yes"
+  ;;
   --disable-qom-cast-debug) qom_cast_debug="no"
   ;;
   --enable-qom-cast-debug) qom_cast_debug="yes"
@@ -1568,9 +1573,11 @@ disabled with --disable-FEATURE, default is enabled if available:
   nettle          nettle cryptography support
   gcrypt          libgcrypt cryptography support
   sdl             SDL UI
-  --with-sdlabi     select preferred SDL ABI 1.2 or 2.0
+  --with-sdlabi   select preferred SDL ABI 1.2 or 2.0
+  --disable-vgt   disable Intel GVT-g technology
+  --enable-vgt    enable Intel GVT-g technology
   gtk             gtk UI
-  --with-gtkabi     select preferred GTK ABI 2.0 or 3.0
+  --with-gtkabi   select preferred GTK ABI 2.0 or 3.0
   vte             vte support for the gtk UI
   curses          curses UI
   vnc             VNC UI support
@@ -2943,6 +2950,12 @@ EOF
     sdl_cflags="$sdl_cflags $x11_cflags"
     sdl_libs="$sdl_libs $x11_libs"
   fi
+fi
+
+##########################################
+# Intel GVT-g detection
+if test "$vgt" = "yes" ; then
+  vgt="yes"
 fi
 
 ##########################################
@@ -5764,6 +5777,7 @@ if test "$darwin" = "yes" ; then
     echo "Cocoa support     $cocoa"
 fi
 echo "SDL support       $sdl $(echo_version $sdl $sdlversion)"
+echo "Intel GVT-g support $vgt"
 echo "GTK support       $gtk $(echo_version $gtk $gtk_version)"
 echo "GTK GL support    $gtk_gl"
 echo "VTE support       $vte $(echo_version $vte $vteversion)"
@@ -6096,6 +6110,9 @@ if test "$sdl" = "yes" ; then
   echo "CONFIG_SDLABI=$sdlabi" >> $config_host_mak
   echo "SDL_CFLAGS=$sdl_cflags" >> $config_host_mak
   echo "SDL_LIBS=$sdl_libs" >> $config_host_mak
+fi
+if test "$vgt" = "yes" ; then
+  echo "CONFIG_VGT=y" >> $config_host_mak
 fi
 if test "$cocoa" = "yes" ; then
   echo "CONFIG_COCOA=y" >> $config_host_mak

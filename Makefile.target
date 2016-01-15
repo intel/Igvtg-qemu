@@ -101,6 +101,7 @@ obj-y += fpu/softfloat.o
 obj-y += target/$(TARGET_BASE_ARCH)/
 obj-y += disas.o
 obj-$(call notempty,$(TARGET_XML_FILES)) += gdbstub-xml.o
+obj-$(call lnot,$(CONFIG_VGT)) += hw/display/vgt-stub.o
 
 #########################################################
 # Linux user emulator target

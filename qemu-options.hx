@@ -1268,6 +1268,8 @@ old style -sdl/-curses/... options. Valid values for @var{type} are
 @item sdl
 Display video output via SDL (usually in a separate graphics
 window; see the SDL documentation for other possibilities).
+@item vgt
+Intel GVT-g technology
 @item curses
 Display video output via curses. For graphics device models which
 support a text mode, QEMU can display this output using a
