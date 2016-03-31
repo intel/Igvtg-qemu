@@ -254,7 +254,6 @@ static void pc_init1(MachineState *machine,
      */
     if (vgt_vga_enabled && pci_enabled) {
         vgt_vga_init(pci_bus);
-        isa_create_simple(isa_bus, "isa-vga");
     } else {
         pc_vga_init(isa_bus, pci_enabled ? pci_bus : NULL);
     }

@@ -256,6 +256,8 @@ libattr=""
 xfs=""
 
 vgt="yes"
+vgt_compositor_egl="yes"
+vgt_compositor_blt="yes"
 vhost_net="no"
 vhost_scsi="no"
 kvm="no"
@@ -834,6 +836,14 @@ for opt do
   ;;
   --enable-vgt) vgt="yes"
   ;;
+  --disable-vgt-compositor-egl) vgt_compositor_egl="no"
+  ;;
+  --enable-vgt-compositor-egl) vgt_compositor_egl="yes"
+  ;;
+  --disable-vgt-compositor-blt) vgt_compositor_blt="no"
+  ;;
+  --enable-vgt-compositor-blt) vgt_compositor_blt="yes"
+  ;;
   --disable-qom-cast-debug) qom_cast_debug="no"
   ;;
   --enable-qom-cast-debug) qom_cast_debug="yes"
@@ -1284,7 +1294,11 @@ Advanced options (experts only):
   --enable-sdl             enable SDL
   --with-sdlabi            select preferred SDL ABI 1.2 or 2.0
   --disable-vgt            disable Intel GVT-g technology
-  --enable-vgt             enable Intel VGT-g technology
+  --enable-vgt             enable Intel GVT-g technology
+  --disable-vgt-compositor-egl
+  --enable-vgt-compositor-egl
+  --disable-vgt-compositor-blt
+  --enable-vgt-compositor-blt
   --disable-gtk            disable gtk UI
   --enable-gtk             enable gtk UI
   --with-gtkabi            select preferred GTK ABI 2.0 or 3.0
@@ -2262,23 +2276,57 @@ fi
 
 ##########################################
 # Intel GVT-g detection
-if test "$vgt" = "yes" ; then
-  cat > $TMPC <<EOF
+if test "$vgt" = "no" ; then
+  vgt_compositor_egl="no"
+  vgt_compositor_blt="no"
+fi
+
+##########################################
+# Intel GVT-g compositor display egl implementation detection
+if test "$vgt_compositor_egl" = "yes" ; then
+  if test "$vgt" = "yes" ; then
+    cat > $TMPC <<EOF
 #include <EGL/egl.h>
 int main(void) { return 0; }
 EOF
-  vgt="yes"
-  if test "$sdl" = "yes" ; then
-    vgt_cflags=`$pkg_config --cflags egl 2> /dev/null`
-    if compile_prog "$vgt_cflags" "" ; then
-      vgt_libs=`$pkg_config --libs libdrm gl egl libudev 2> /dev/null`
-      libs_softmmu="$vgt_libs $libs_softmmu"
-      QEMU_CFLAGS="$vgt_cflags $QEMU_CFLAGS"
+    if test "$sdl" = "yes" ; then
+      vgt_compositor_egl_cflags=`$pkg_config --cflags egl 2> /dev/null`
+      if compile_prog "$vgt_compositor_egl_cflags" "" ; then
+        vgt_compositor_egl_libs=`$pkg_config --libs libdrm gl egl libudev 2> /dev/null`
+        libs_softmmu="$vgt_compositor_egl_libs $libs_softmmu"
+        QEMU_CFLAGS="$vgt_compositor_egl_cflags $QEMU_CFLAGS"
+        if test "$vgt_compositor_blt" = "yes" ; then
+          vgt_compositor_blt="no"
+        fi
+      else
+        echo "Intel GVT-g compositor egl will be disabled due to EGL library missed."
+        vgt_compositor_egl="no"
+      fi
     else
-      error_exit "EGL library missed. Please EGL library first."
+      echo "Intel GVT-g compositor egl will be disabled due to SDL disabled."
+      vgt_compositor_egl="no"
     fi
   else
-    echo "Intel VGT indirect display will be disabled due to SDL disabled!"
+    vgt_compositor_egl="no"
+    echo "Intel GVT-g compositor egl will be disabled due to vgt disabled."
+  fi
+fi
+
+##########################################
+# Intel VGT-g compositor display blt implementation detection
+if test "$vgt_compositor_blt" = "yes" ; then
+  if test "$vgt" = "yes" ; then
+    if test "$sdl" = "yes" ; then
+      vgt_compositor_blt_cflags=`$pkg_config --cflags libdrm 2> /dev/null`
+      vgt_compositor_blt_libs=`$pkg_config --libs libdrm libudev 2> /dev/null`
+      libs_softmmu="$vgt_compositor_blt_libs $libs_softmmu"
+      QEMU_CFLAGS="$vgt_compositor_blt_cflags $QEMU_CFLAGS"
+    else
+      echo "Intel GVT-g compositor blt will be enabled but only remote display can be used."
+    fi
+  else
+    echo "Intel GVT-g compositor blt will be disabled due to vgt disabled."
+    vgt_compositor_blt="no"
   fi
 fi
 
@@ -4388,6 +4436,8 @@ fi
 echo "pixman            $pixman"
 echo "SDL support       $sdl"
 echo "Intel GVT-g support $vgt"
+echo "Intel GVT-g compositor egl $vgt_compositor_egl"
+echo "Intel GVT-g compositor blt $vgt_compositor_blt"
 echo "GTK support       $gtk"
 echo "VTE support       $vte"
 echo "curses support    $curses"
@@ -4643,6 +4693,12 @@ if test "$sdl" = "yes" ; then
 fi
 if test "$vgt" = "yes" ; then
   echo "CONFIG_VGT=y" >> $config_host_mak
+fi
+if test "$vgt_compositor_egl" = "yes" ; then
+  echo "CONFIG_VGT_COMPOSITOR_EGL=y" >> $config_host_mak
+fi
+if test "$vgt_compositor_blt" = "yes" ; then
+  echo "CONFIG_VGT_COMPOSITOR_BLT=y" >> $config_host_mak
 fi
 if test "$cocoa" = "yes" ; then
   echo "CONFIG_COCOA=y" >> $config_host_mak
