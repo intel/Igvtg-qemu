@@ -562,10 +562,11 @@ static int vgt_host_pci_cfg_get(VGTHostDevice *host_dev,
     if (ret < len) {
         ret = ret < 0 ? -errno : -EFAULT;
         error_report("failed to read device config space: %m");
-        return ret;
+        goto out;
     }
-    vgt_host_device_put(host_dev);
 
+out:
+    vgt_host_device_put(host_dev);
     return ret;
 }
 
