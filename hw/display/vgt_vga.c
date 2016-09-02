@@ -74,6 +74,7 @@ int vgt_high_gm_sz = 448; /* in MB */
 int vgt_fence_sz = 4;
 int vgt_primary = 1; /* -1 means "not specified */
 int guest_domid = 0;
+int vgt_cap = 0;
 
 static int vgt_host_pci_cfg_get(VGTHostDevice *host_dev,
                                 void *data, int len, uint32_t addr);
@@ -99,9 +100,12 @@ static void create_vgt_instance(VGTVGAState *vdev)
     int domid = vdev->domid;
   
     qemu_log("vGT: %s: domid=%d, low_gm_sz=%dMB, high_gm_sz=%dMB, "
-        "fence_sz=%d, vgt_primary=%d\n", __func__, domid,
-        vgt_low_gm_sz, vgt_high_gm_sz, vgt_fence_sz, vgt_primary);
-    if (vgt_low_gm_sz <= 0 || vgt_high_gm_sz <=0 ||
+        "fence_sz=%d, vgt_primary=%d, vgt_cap=%d\n", __func__, domid,
+       	vgt_low_gm_sz, vgt_high_gm_sz, vgt_fence_sz, vgt_primary,
+      	vgt_cap);
+  
+ if (vgt_low_gm_sz <= 0 || vgt_high_gm_sz <=0 ||
+                vgt_cap < 0 || vgt_cap > 100 ||
 		vgt_primary < -1 || vgt_primary > 1 ||
         vgt_fence_sz <=0) {
         qemu_log("vGT: %s failed: invalid parameters!\n", __func__);
@@ -117,8 +121,9 @@ static void create_vgt_instance(VGTVGAState *vdev)
      * driver to create a vgt instanc for Domain domid with the required
      * parameters. NOTE: aperture_size and gm_size are in MB.
      */
-    if (!err && fprintf(vgt_file, "%d,%u,%u,%u,%d\n", domid,
-        vgt_low_gm_sz, vgt_high_gm_sz, vgt_fence_sz, vgt_primary) < 0) {
+    if (!err && fprintf(vgt_file, "%d,%u,%u,%u,%d,%u\n", domid,
+        vgt_low_gm_sz, vgt_high_gm_sz, vgt_fence_sz, vgt_primary,
+		vgt_cap) < 0) {
         err = errno;
     }
 

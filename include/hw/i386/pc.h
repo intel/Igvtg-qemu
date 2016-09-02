@@ -335,6 +335,7 @@ int isa_vga_mm_init(hwaddr vram_base,
 extern int vgt_low_gm_sz;
 extern int vgt_high_gm_sz;
 extern int vgt_fence_sz;
+extern int vgt_cap;
 
 DeviceState *vgt_vga_init(PCIBus *pci_bus);
 void vgt_bridge_pci_conf_init(PCIDevice *dev);

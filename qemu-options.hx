@@ -1316,6 +1316,15 @@ STEXI
 Start in full screen.
 ETEXI
 
+DEF("vgt_cap", 1, QEMU_OPTION_vgt_cap,
+    "-vgt_cap [num] allocated percentage for GPU resource portion\n",
+    QEMU_ARCH_ALL)
+STEXI
+@item -vgt_cap @var{size}
+@findex -vgt_cap
+Set the allocated GPU resource portion.
+ETEXI
+
 DEF("g", 1, QEMU_OPTION_g ,
     "-g WxH[xDEPTH]  Set the initial graphical resolution and depth\n",
     QEMU_ARCH_PPC | QEMU_ARCH_SPARC)
