@@ -67,6 +67,7 @@ typedef struct buffer_rec{
 typedef struct buffer_list{
     struct buffer_rec *l;
     int len;
+	bool firstcreated;
 } buffer_list;
 
 struct buffer_list primary_list;
@@ -182,10 +183,10 @@ static int find_rec(struct buffer_list *l, struct drm_i915_gem_vgtbuffer
             l->l[i].size == vgtbuffer->size) {
             r = i;
             break;
-        } else if (l->l[i].start == vgtbuffer->start) {
-            memset(&(l->l[i]), 0, sizeof(struct buffer_list));
-            l->l[i].age = INT_MAX;
-            break;
+		} else if ((l->l[i].tiled != vgtbuffer->tiled) ||
+					(l->l[i].size != vgtbuffer->size)) {
+			l->firstcreated = false;
+			break;
         }
     }
 
@@ -228,7 +229,7 @@ static void create_cursor_buffer(void)
 {
     int width = 0, height = 0, stride = 0;
     struct drm_i915_gem_vgtbuffer vcreate;
-    int r;
+	int i, r;
     EGLImageKHR namedimage;
     unsigned long name;
 
@@ -243,6 +244,15 @@ static void create_cursor_buffer(void)
     drmIoctl(fd, DRM_IOCTL_I915_GEM_VGTBUFFER, &vcreate);
 
     current_cursor_fb_addr = vcreate.start;
+
+	if (!cursor_list.firstcreated) {
+		for (i = 0; i < cursor_list.len; i++) {
+			clear_rec(&cursor_list, i);
+			cursor_list.l[i].tiled = 0;
+			cursor_list.l[i].size  = vcreate.size;
+		}
+		cursor_list.firstcreated = true;
+	}
 
     r = oldest_rec(&cursor_list);
     glGenTextures(1, &cursortextureId);
@@ -304,13 +314,17 @@ static void create_cursor_buffer(void)
     }
     glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, namedimage);
     eglDestroyImageKHR(dpy, namedimage);
+
+    if (dma_buf_mode) {
+        close(name);
+    }
 }
 
 static void create_primary_buffer(void)
 {
     struct drm_i915_gem_vgtbuffer vcreate;
     int width = 0, height = 0 ,stride = 0;
-    int r;
+	int i, r;
     EGLImageKHR namedimage;
     unsigned long name;
 
@@ -330,6 +344,16 @@ static void create_primary_buffer(void)
     fbWidth = width;
     fbHeight = height;
     current_primary_fb_addr = vcreate.start;
+
+	if (!primary_list.firstcreated) {
+		for (i = 0; i < primary_list.len; i++) {
+			clear_rec(&primary_list, i);
+			primary_list.l[i].tiled = vcreate.tiled;
+			primary_list.l[i].size  = vcreate.size;
+		}
+		primary_list.firstcreated = true;
+	}
+
     r = oldest_rec(&primary_list);
 
     glGenTextures(1, &textureId);
@@ -391,12 +415,16 @@ static void create_primary_buffer(void)
     }
     glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, namedimage);
     eglDestroyImageKHR(dpy, namedimage);
+
+    if (dma_buf_mode) {
+        close(name);
+    }
 }
 
 static void check_for_new_primary_buffer(void)
 {
     struct drm_i915_gem_vgtbuffer vcreate;
-    int r = 0, i;
+	int r = 0;
     uint32_t start;
 
     memset(&vcreate, 0, sizeof(struct drm_i915_gem_vgtbuffer));
@@ -408,9 +436,7 @@ static void check_for_new_primary_buffer(void)
     r = drmIoctl(fd, DRM_IOCTL_I915_GEM_VGTBUFFER, &vcreate);
     if (r != 0 || vcreate.start == 0) {
         current_primary_fb_addr = 0;
-        for (i = 0; i < primary_list.len; i++) {
-            clear_rec(&primary_list, i);
-        }
+		primary_list.firstcreated = false;
         return;
     }
 
@@ -432,7 +458,7 @@ static void check_for_new_primary_buffer(void)
 static void check_for_new_cursor_buffer(int *x, int *y)
 {
     struct drm_i915_gem_vgtbuffer vcreate;
-    int r, i;
+	int r;
     uint32_t cursorstart;
 
     memset(&vcreate, 0, sizeof(struct drm_i915_gem_vgtbuffer));
@@ -443,9 +469,7 @@ static void check_for_new_cursor_buffer(int *x, int *y)
     r = drmIoctl(fd, DRM_IOCTL_I915_GEM_VGTBUFFER, &vcreate);
     if (r != 0 || vcreate.start <= 0) {
         current_cursor_fb_addr = 0;
-        for ( i = 0; i < cursor_list.len; i++) {
-            clear_rec(&cursor_list, i);
-        }
+		cursor_list.firstcreated = false;
         cursor_ready = false;
         return;
     }
@@ -647,12 +671,14 @@ static void vgt_init(void)
         exit(1);
     }
     primary_list.len = PRIMARY_LIST_LEN;
+	primary_list.firstcreated = false;
     cursor_list.l = malloc(CURSOR_LIST_LEN*sizeof(struct buffer_rec));
     if (cursor_list.l == NULL) {
         fprintf(stderr, "allocate cursor list failed\n");
         exit(1);
     }
     cursor_list.len = CURSOR_LIST_LEN;
+	cursor_list.firstcreated = false;
     for (i = 0; i < primary_list.len; i++) {
         primary_list.l[i].start = 0;
         primary_list.l[i].textureId = 0;

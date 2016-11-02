@@ -111,14 +111,7 @@ static void pc_init1(MachineState *machine,
      * breaking migration.
      */
     if (vgt_vga_enabled) {
-        /* There's a known issue for KVMGT when the GPU's aperture mem is located
-           * above high 4G. Limit the lowmem size to make sure aperture mem is always
-           * located in low 4G place.
-           */
-        lowmem = 0x80000000;
-        if (lowmem < machine->ram_size)
-            printf("RAM size is %ldMB, lowmem is %ldMB.\n",
-                machine->ram_size >> 20, lowmem >> 20);
+        lowmem = 0xC0000000;
     } else if (machine->ram_size >= 0xe0000000) {
         lowmem = gigabyte_align ? 0xc0000000 : 0xe0000000;
     } else {

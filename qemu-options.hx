@@ -1168,6 +1168,15 @@ STEXI
 Set the allocated aperture size.
 ETEXI
 
+DEF("vgt_cap", 1, QEMU_OPTION_vgt_cap,
+    "-vgt_cap [num] allocated percentage for GPU resource portion\n",
+    QEMU_ARCH_ALL)
+STEXI
+@item -vgt_cap @var{size}
+@findex -vgt_cap
+Set the allocated GPU resource portion.
+ETEXI
+
 DEF("vgt_monitor_config_file", HAS_ARG, QEMU_OPTION_vgt_monitor_config_file,
     "-vgt_monitor_config_file file Use 'file' to config monitor while creating vgt instance.\n",
     QEMU_ARCH_ALL)

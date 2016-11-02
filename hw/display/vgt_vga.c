@@ -21,6 +21,7 @@
 #include "qemu/log.h"
 #include "sysemu/arch_init.h"
 #include "hw/xen/xen.h"
+#include "exec/ram_addr.h"
 
 #define DEBUG_VGT
 
@@ -32,18 +33,33 @@
     do { } while (0)
 #endif
 
+#define FUNC_ENTER DPRINTF("[%s] Enter\n", __FUNCTION__)
+#define FUNC_EXIT DPRINTF("[%s] Exit\n", __FUNCTION__)
+
+#define BITS_TO_BYTES(bits) (((bits) + BITS_PER_BYTE - 1)/BITS_PER_BYTE)
+
 typedef struct VGTHostDevice {
     PCIHostDeviceAddress addr;
     int config_fd;
 } VGTHostDevice;
 
+struct VGTVGAState;
+
+typedef struct VGTVMState {
+    struct VGACommonState vga;
+    struct VGTVGAState* parent;
+} VGTVMState;
+
 typedef struct VGTVGAState {
     PCIDevice dev;
-    struct VGACommonState state;
+    VGTVMState state;
     int num_displays;
     VGTHostDevice host_dev;
     bool instance_created;
     int domid;
+    /* for KVMGT migration support*/
+    bool vgt_paused;
+    MemoryListener vgt_memory_listener;
 } VGTVGAState;
 
 #define EDID_SIZE 128
@@ -72,6 +88,7 @@ int vgt_low_gm_sz = 64; /* in MB */
 int vgt_high_gm_sz = 448; /* in MB */
 int vgt_fence_sz = 4;
 int vgt_primary = 1; /* -1 means "not specified */
+int vgt_cap = 0;
 const char *vgt_monitor_config_file = NULL;
 
 int guest_domid = 0;
@@ -80,6 +97,18 @@ int get_guest_domid(void)
     return guest_domid;
 }
 
+static void cpu_update_state(void *opaque, int running, RunState state);
+
+static void vgt_log_start(MemoryListener *listener,
+                          MemoryRegionSection *section);
+static void vgt_log_stop(MemoryListener *listener,
+                          MemoryRegionSection *section);
+static void vgt_log_sync(MemoryListener *listener,
+                         MemoryRegionSection *section);
+static void vgt_log_global_start(struct MemoryListener *listener);
+static void vgt_log_global_stop(struct MemoryListener *listener);
+
+int dirty_bitmap_read(uint8_t* bitmap, unsigned long off, unsigned long count);
 static int vgt_host_pci_cfg_get(VGTHostDevice *host_dev,
                                 void *data, int len, uint32_t addr);
 
@@ -445,9 +474,11 @@ static void create_vgt_instance(VGTVGAState *vdev)
     int domid = vdev->domid;
 
     qemu_log("vGT: %s: domid=%d, low_gm_sz=%dMB, high_gm_sz=%dMB, "
-        "fence_sz=%d, vgt_primary=%d\n", __func__, domid,
-        vgt_low_gm_sz, vgt_high_gm_sz, vgt_fence_sz, vgt_primary);
+        "fence_sz=%d, vgt_primary=%d, vgt_cap=%d\n", __func__, domid,
+        vgt_low_gm_sz, vgt_high_gm_sz, vgt_fence_sz, vgt_primary,
+		vgt_cap);
     if (vgt_low_gm_sz <= 0 || vgt_high_gm_sz <=0 ||
+               vgt_cap < 0 || vgt_cap > 100 ||
 		vgt_primary < -1 || vgt_primary > 1 ||
         vgt_fence_sz <=0) {
         qemu_log("vGT: %s failed: invalid parameters!\n", __func__);
@@ -468,8 +499,9 @@ static void create_vgt_instance(VGTVGAState *vdev)
      * driver to create a vgt instanc for Domain domid with the required
      * parameters. NOTE: aperture_size and gm_size are in MB.
      */
-    if (!err && fprintf(vgt_file, "%d,%u,%u,%u,%d\n", domid,
-        vgt_low_gm_sz, vgt_high_gm_sz, vgt_fence_sz, vgt_primary) < 0) {
+    if (!err && fprintf(vgt_file, "%d,%u,%u,%u,%d,%u\n", domid,
+        vgt_low_gm_sz, vgt_high_gm_sz, vgt_fence_sz, vgt_primary,
+		vgt_cap) < 0) {
         err = errno;
     }
 
@@ -483,7 +515,8 @@ static void create_vgt_instance(VGTVGAState *vdev)
     }
 
     config_vgt_guest_monitors(vdev);
-    vdev->instance_created = TRUE;
+    vdev->instance_created = true;
+    vdev->vgt_paused = false;
 }
 
 /*
@@ -622,7 +655,6 @@ void vgt_bridge_pci_conf_init(PCIDevice *pdev)
     vgt_host_pci_cfg_get(&host_dev, pdev->config + 0x50, 2, 0x50);
     /* processor graphics control register */
     vgt_host_pci_cfg_get(&host_dev, pdev->config + 0x52, 2, 0x52);
-
 }
 
 static void vgt_reset(DeviceState *dev)
@@ -679,6 +711,20 @@ static int vgt_initfn(PCIDevice *dev)
     DPRINTF("vgt_initfn\n");
     vgt_host_dev_init(dev, &d->host_dev);
     d->domid = vgt_get_domid();
+    d->state.parent = d;
+    d->vgt_paused = false;
+
+    d->vgt_memory_listener = (MemoryListener) {
+        .log_start = vgt_log_start,
+        .log_stop = vgt_log_stop,
+        .log_sync = vgt_log_sync,
+        .log_global_start = vgt_log_global_start,
+        .log_global_stop = vgt_log_global_stop,
+    };
+
+    memory_listener_register(&d->vgt_memory_listener, &address_space_memory);
+
+    qemu_add_vm_change_state_handler(cpu_update_state, d);
 
     return 0;
 }
@@ -745,6 +791,398 @@ DeviceState *vgt_vga_init(PCIBus *pci_bus)
     return DEVICE(dev);
 }
 
+/*
+ * Keep this function to profile logdirty APIs
+ */
+static inline unsigned long rdtscll(void)
+{
+    unsigned long val;
+    asm volatile("rdtsc" : "=A" (val));
+    return val;
+}
+
+/*
+ * is_read = ture:  Read vGPU state and provide to QEMU file
+ * is_read = false: Get QEMU file and write migrating source data to vGPU state
+ */
+static void read_write_snapshot(QEMUFile* f, VGTVGAState* d, bool is_read)
+{
+    char file_name[PATH_MAX] = {0};
+    FILE* fp = NULL;
+    struct stat st;
+    int sz;
+    uint8_t* buf = NULL;
+    int count = 0;
+
+    FUNC_ENTER;
+
+    snprintf(file_name, PATH_MAX, "/sys/kernel/vgt/vm%d/state", d->domid);
+
+    if ((fp=fopen(file_name, "r+")) == NULL) {
+        qemu_log("vGT: %s failed to open file %s! errno = %d\n",
+                __func__, file_name, errno);
+        goto EXIT;
+    }
+
+    fstat(fileno(fp), &st);
+    sz = st.st_size;
+
+    if (sz <= 0) {
+        qemu_log("vGT: failed to achieve file size. file name=%s \n",
+               file_name);
+        goto EXIT;
+    }
+
+
+    if ((buf=g_malloc(sz))==NULL) {
+        qemu_log("vGT: %s failed to allocate memory size %d! errno = %d\n",
+                __func__, sz, errno);
+        goto EXIT;
+    }
+
+    DPRINTF("Allocate %d size of buffer for snapshot\n", sz);
+
+    if (is_read) {
+        count = fread(buf, 1, sz, fp);
+        qemu_put_buffer(f, buf, sz);
+    }
+    else {
+        qemu_get_buffer(f, buf, sz);
+        count = fwrite(buf, 1, sz, fp);
+    }
+
+    if (count != sz) {
+        qemu_log("vGT: read/write snapshot file size is differ %d:%d \n",
+                count, sz);
+    }
+
+    DPRINTF("[%s] %d size of buffer for snapshot\n", is_read? "READ":"WRITE",
+            count);
+
+EXIT:
+    if (buf)
+        g_free(buf);
+    if (fp)
+        fclose(fp);
+    return;
+}
+
+/*
+ * Pause vGPU scheduling from GVT-g scheduling
+ */
+static void vgt_pause(int domid)
+{
+    int ret;
+    /* pause vGPU scheduling */
+    char cmd[PATH_MAX] = {0};
+    /* switch foreground to Dom0 first */
+    snprintf(cmd, PATH_MAX, "echo 0 > /sys/kernel/vgt/control/foreground_vm");
+    ret = system(cmd);
+    if (ret < 0) {
+        DPRINTF("Execute commands failed. \n");
+    }
+
+    memset(cmd, 0, PATH_MAX);
+    /* remove DomID from vGPU scheduling */
+    snprintf(cmd, PATH_MAX, "echo 0 > /sys/kernel/vgt/vm%d/start", domid);
+    ret = system(cmd);
+    if (ret < 0) {
+        DPRINTF("Execute commands failed. \n");
+    }
+}
+
+/*
+ * Add back vGPU to GVT-g scheduling
+ */
+static void vgt_resume(int domid)
+{
+    int ret;
+    /* resume vGPU scheduling */
+    char cmd[PATH_MAX] = {0};
+    snprintf(cmd, PATH_MAX, "echo 1 > /sys/kernel/vgt/vm%d/start", domid);
+    ret = system(cmd);
+    if (ret < 0) {
+        DPRINTF("Execute commands failed. \n");
+    }
+}
+
+/*
+ * QEMU callback function whenever CPU state changed to:
+ * pause/Migrate/resume/running
+ */
+static void cpu_update_state(void *opaque, int running, RunState state)
+{
+    VGTVGAState *d = (VGTVGAState*) opaque;
+
+    FUNC_ENTER;
+    if (state == RUN_STATE_FINISH_MIGRATE) {
+        /* pause vGPU scheduling */
+        vgt_pause(d->domid);
+        d->vgt_paused = true;
+    }
+    FUNC_EXIT;
+}
+
+/*
+ * bitmap:  output of dirty_bitmap status
+ * off:  read /sys/kernel/vgt/vm#/dirty_bitmap from offset in bytes
+ * count: read bytes
+ */
+int dirty_bitmap_read(uint8_t* bitmap, unsigned long off, unsigned long count)
+{
+    char file_name[PATH_MAX] = {0};
+    int domid = vgt_get_domid();
+    int fd = -1;
+    int sz = 1<<TARGET_PAGE_BITS; /* one page*/
+    char* buf = NULL;
+    unsigned long total=0;
+
+    snprintf(file_name, PATH_MAX, "/sys/kernel/vgt/vm%d/dirty_bitmap", domid);
+
+    /* must use low level open() instead of fopen() */
+    if ((fd=open(file_name, O_RDWR)) == -1) {
+        qemu_log("vGT: %s failed to open file %s! errno = %d\n",
+                __func__, file_name, errno);
+        goto EXIT;
+    }
+
+    if (count < sz)
+        sz = count;
+
+    buf = g_malloc(sz);
+
+    /*STEP1: Set to all dirty before achieve real GPU bitmap */
+    memset(buf, 0xFF, sz);
+
+    if (lseek(fd, off, SEEK_SET) == -1) {
+        DPRINTF("Seek to 0x%lx failed. \n", off);
+        goto EXIT;
+    }
+
+    total = 0;
+    while(1){
+        int remains = (count - total) > sz ? sz: count -total;
+        int n_written = write(fd, buf, remains);
+        if (n_written < 0) {
+            DPRINTF("Write dirty_bitmap failed.\n");
+            total = 0;
+            goto EXIT;
+        }
+
+        total += n_written;
+        if (n_written < remains || total >= count )
+            break;
+        
+    }
+
+    DPRINTF("WRITE 0x%lx size of dirty_bitmap from offset=0x%lx."
+           " Actual write 0x%lx \n", count, off, total);
+    if (total <= 0) 
+        goto EXIT;
+
+    /*STEP2: Read back all dirty status*/
+    total = 0;
+    if (lseek(fd, off, SEEK_SET) == -1) {
+        DPRINTF("Seek to 0x%lx failed. \n", off);
+        goto EXIT;
+    }
+
+    while(1){
+        int remains = (count - total) > sz ? sz: count -total;
+        int n_read = read(fd, buf, remains);
+        if (n_read < 0) {
+            DPRINTF("Read dirty_bitmap failed. \n");
+            total = 0;
+            goto EXIT;
+        }
+
+        memcpy(bitmap + total, buf, n_read);
+        total += n_read;
+        if (n_read < remains || total >= count )
+            break;
+    }
+
+    DPRINTF("READ 0x%lx size of dirty_bitmap from offset=0x%lx."
+            " Actual get 0x%lx \n", count, off, total);
+
+EXIT:
+    if (buf)
+        g_free(buf);
+    if (fd != -1)
+        close(fd);
+    return total;
+}
+
+static void vgt_sync_dirty_bitmap(VGTVGAState *d, uint8_t *ram_bitmap, 
+        unsigned long ram_bitmap_size, /* bitmap size in bytes */
+        unsigned long start_addr, 
+        unsigned long nr_pages)
+{
+    unsigned long bit_start = start_addr >> TARGET_PAGE_BITS;
+    int bit_offset = bit_start % BITS_PER_BYTE;
+    int n = 0;
+
+    FUNC_ENTER;
+
+    n = dirty_bitmap_read(ram_bitmap, bit_start / BITS_PER_BYTE, 
+            BITS_TO_BYTES(nr_pages + (bit_start % BITS_PER_BYTE)));
+    memset(ram_bitmap + n, 0, ram_bitmap_size - n);
+
+    if (n > 0 && bit_offset) {
+        /* bit_start is not BTYES aligned.*/
+        char* dst = (char*) ram_bitmap;
+        char* src = dst;
+        int i;
+
+        DPRINTF("Hit non-bytes aligned bit operation. Shift bit: %d \n",
+                bit_offset);
+        for(i=0; i< nr_pages / BITS_PER_BYTE; i++) {
+            char b;
+            b = src[i];
+            b >>= bit_offset;
+            b &= (src[i + 1] << (BITS_PER_BYTE - bit_offset));
+            dst[i] = b;
+        }
+        /* clear last bytes */
+        dst[i+1] = 0;
+    }
+
+    return;
+}
+
+/*
+ * Qemu callback function whenever log dirty required
+ */
+static void vgt_log_sync(MemoryListener *listener,
+        MemoryRegionSection *section)
+{
+    VGTVGAState *d = container_of(listener, 
+            struct VGTVGAState, vgt_memory_listener);
+
+    if (d->vgt_paused) {
+        hwaddr start_addr = section->offset_within_address_space;
+        ram_addr_t size = int128_get64(section->size);
+        unsigned long nr_pages = size >> TARGET_PAGE_BITS;	
+        /* allocate additional 8 bytes in case (start_addr>>12)
+         * is not bytes aligned.*/
+        unsigned long bitmap_size =
+            (BITS_TO_LONGS(nr_pages) + 1)*sizeof(unsigned long);
+        unsigned long *bitmap = g_malloc(bitmap_size);
+
+        DPRINTF("[%s] MemSection HWADDR 0x%lx size 0x%lx bitmap_size=0x%lx \n",
+               __FUNCTION__, start_addr, size, bitmap_size);
+
+        vgt_sync_dirty_bitmap(d,
+                (uint8_t*)bitmap,
+                bitmap_size,
+                start_addr,
+                nr_pages);
+
+        cpu_physical_memory_set_dirty_lebitmap(bitmap, start_addr, nr_pages);
+
+        g_free(bitmap);
+    }
+}
+
+static void vgt_log_start(MemoryListener *listener,
+        MemoryRegionSection *section)
+{
+}
+
+static void vgt_log_stop(MemoryListener *listener,
+        MemoryRegionSection *section)
+{
+}
+
+static void vgt_log_global_start(struct MemoryListener *listener)
+{
+    /* currently not used. keep for furture extension */
+}
+
+static void vgt_log_global_stop(struct MemoryListener *listener)
+{
+    /* currently not used. keep for furture extension */
+}
+
+static void put_snapshot(QEMUFile *f, void *pv, size_t size)
+{
+    VGTVGAState *d = ((VGTVMState*) pv)->parent;
+
+    FUNC_ENTER;
+
+    /* pause vGPU scheduling if not */
+    if (!d->vgt_paused) {
+        vgt_pause(d->domid);
+        d->vgt_paused = true;
+    }
+
+    /* Sending VM: Read snapshot and write to qemu file*/
+    read_write_snapshot(f, d, 1);
+
+    /* recreate vGPU instance */
+    destroy_vgt_instance(d->domid);
+    create_vgt_instance(d);
+    /* set vgt to run as we have new instance */
+    d->vgt_paused = false;
+}
+
+static int get_snapshot(QEMUFile *f, void *pv, size_t size)
+{
+    VGTVGAState *d = ((VGTVMState*) pv)->parent;
+
+    FUNC_ENTER;
+    /* Receiving VM: Read from qemu file and write to snapshot */
+    read_write_snapshot(f, d, 0);
+
+    /* resume vGPU scheduling */
+    vgt_resume(d->domid);
+    d->vgt_paused = false;
+    return 0;
+}
+
+/*
+ * VMState structure to read/write vGPU state from GVT-g
+ */
+static VMStateInfo vmstate_info_snapshot = {
+    .name = "snapshot state",
+    .get  = get_snapshot,
+    .put  = put_snapshot,
+};
+
+const VMStateDescription vmstate_vgt_internal_common = {
+    .name = "vgt-internal",
+    .version_id = 2,
+    .minimum_version_id = 2,
+    .fields = (VMStateField[]) {
+        {
+            .name         = "snapshot",
+            .version_id   = 0,
+            .field_exists = NULL,
+            .size         = 0,   /* ouch */
+            .info         = &vmstate_info_snapshot,
+            .flags        = VMS_SINGLE,
+            .offset       = 0,
+        },
+
+        VMSTATE_END_OF_LIST()
+    },
+};
+
+/*
+ * Cleanup to ignore Qemu VGA save/restore here, since we do not use that.
+ * Add GVT-g VMState to save/restore GVT-g vGPU state during migration
+ */
+static const VMStateDescription vmstate_vga_vgt = {
+    .name = "vga-vgt",
+    .version_id = 2,
+    .minimum_version_id = 2,
+    .fields = (VMStateField[]) {
+        VMSTATE_PCI_DEVICE(dev, VGTVGAState),
+        VMSTATE_STRUCT(state, VGTVGAState, 0, vmstate_vgt_internal_common, VGTVMState),
+        VMSTATE_END_OF_LIST()
+    }
+};
+
 static void vgt_class_initfn(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
@@ -752,8 +1190,9 @@ static void vgt_class_initfn(ObjectClass *klass, void *data)
     ic->init = vgt_initfn;
     dc->reset = vgt_reset;
     ic->exit = vgt_cleanupfn;
-    dc->vmsd = &vmstate_vga_common;
+    dc->vmsd = &vmstate_vga_vgt;
 }
+
 
 static TypeInfo igd_info = {
     .name          = "vgt-vga",

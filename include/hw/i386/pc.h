@@ -263,6 +263,7 @@ int isa_vga_mm_init(hwaddr vram_base,
 extern int vgt_low_gm_sz;
 extern int vgt_high_gm_sz;
 extern int vgt_fence_sz;
+extern int vgt_cap;
 extern const char *vgt_monitor_config_file;
 
 DeviceState *vgt_vga_init(PCIBus *pci_bus);
