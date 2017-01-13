@@ -30,6 +30,7 @@
 #include "ui/console.h"
 #include "ui/input.h"
 #include "ui/sdl2.h"
+#include "ui/egl-helpers.h"
 #include "sysemu/sysemu.h"
 
 #include <epoxy/gl.h>
@@ -209,6 +210,20 @@ void sdl2_gl_scanout_texture(DisplayChangeListener *dcl,
     sdl2_set_scanout_mode(scon, true);
     egl_fb_setup_for_tex(&scon->guest_fb, backing_width, backing_height,
                          backing_id, false);
+}
+
+void sdl2_gl_scanout_dmabuf(DisplayChangeListener *dcl,
+                            QemuDmaBuf *dmabuf)
+{
+    struct sdl2_console *scon = container_of(dcl, struct sdl2_console, dcl);
+    int tex_id = 0;
+
+    /* TODO: import dmabuf */
+
+    sdl2_gl_scanout_texture(dcl, tex_id,
+                            false, dmabuf->width, dmabuf->height,
+                            0, 0, dmabuf->width, dmabuf->height);
+    scon->guest_fb.delete_texture = true;
 }
 
 void sdl2_gl_scanout_flush(DisplayChangeListener *dcl,
