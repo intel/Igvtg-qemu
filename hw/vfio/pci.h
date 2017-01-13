@@ -132,6 +132,8 @@ typedef struct VFIOPCIDevice {
 #define VFIO_FEATURE_ENABLE_IGD_OPREGION_BIT 2
 #define VFIO_FEATURE_ENABLE_IGD_OPREGION \
                                 (1 << VFIO_FEATURE_ENABLE_IGD_OPREGION_BIT)
+#define VFIO_FEATURE_ENABLE_DISPLAY_BIT 3
+#define VFIO_FEATURE_ENABLE_DISPLAY (1 << VFIO_FEATURE_ENABLE_DISPLAY_BIT)
     int32_t bootindex;
     uint32_t igd_gms;
     uint8_t pm_cap;
@@ -170,5 +172,7 @@ int vfio_populate_vga(VFIOPCIDevice *vdev, Error **errp);
 int vfio_pci_igd_opregion_init(VFIOPCIDevice *vdev,
                                struct vfio_region_info *info,
                                Error **errp);
+
+int vfio_display_probe(VFIOPCIDevice *vdev, Error **errp);
 
 #endif /* HW_VFIO_VFIO_PCI_H */
