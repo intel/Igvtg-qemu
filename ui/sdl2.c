@@ -92,6 +92,10 @@ void sdl2_window_create(struct sdl2_console *scon)
                                          flags);
     scon->real_renderer = SDL_CreateRenderer(scon->real_window, -1, 0);
     if (scon->opengl) {
+        int value = 42;
+        SDL_GL_GetAttribute(SDL_GL_CONTEXT_EGL, &value);
+        fprintf(stderr, "%s:%d: SDL_GL_CONTEXT_EGL %d\n",
+                __func__, __LINE__, value);
         scon->winctx = SDL_GL_GetCurrentContext();
     }
     sdl_update_caption(scon);
