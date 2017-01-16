@@ -37,9 +37,8 @@ common-obj-y += egl-context.o
 common-obj-$(CONFIG_OPENGL_DMABUF) += egl-headless.o
 ifeq ($(CONFIG_GTK_GL),y)
 common-obj-$(CONFIG_GTK) += gtk-gl-area.o
-else
-common-obj-$(CONFIG_GTK) += gtk-egl.o
 endif
+common-obj-$(CONFIG_GTK) += gtk-egl.o
 endif
 
 gtk.o-cflags := $(GTK_CFLAGS) $(VTE_CFLAGS)
