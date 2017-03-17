@@ -1116,13 +1116,35 @@ static void put_snapshot(QEMUFile *f, void *pv, size_t size)
         d->vgt_paused = true;
     }
 
+    /* vgt device log dirty pages in xen */
+    if (xen_enabled()) {
+        ram_addr_t start_pfn, end_pfn;
+        ram_addr_t nb_pages = last_ram_offset() >> TARGET_PAGE_BITS;
+        unsigned long bitmap_size =
+            BITS_TO_LONGS(nb_pages) * sizeof(unsigned long);
+        unsigned long *bitmap = g_malloc(bitmap_size);
+        start_pfn = 0;
+
+        vgt_sync_dirty_bitmap(d,
+            (uint8_t*)bitmap,
+            bitmap_size,
+            start_pfn,
+            nb_pages);
+
+        for (start_pfn = find_first_bit(bitmap, nb_pages);
+            start_pfn < nb_pages;
+            start_pfn = find_next_bit(bitmap, nb_pages, end_pfn + 1)) {
+            end_pfn = find_next_zero_bit(bitmap, nb_pages, start_pfn);
+            xen_modified_memory(start_pfn << TARGET_PAGE_BITS,
+                (end_pfn - start_pfn) * TARGET_PAGE_SIZE);
+        }
+
+        g_free(bitmap);
+    }
+
     /* Sending VM: Read snapshot and write to qemu file*/
     read_write_snapshot(f, d, 1);
 
-    /* recreate vGPU instance */
-    destroy_vgt_instance(d->domid);
-    create_vgt_instance(d);
-    /* set vgt to run as we have new instance */
     d->vgt_paused = false;
 }
 
