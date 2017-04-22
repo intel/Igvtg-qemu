@@ -331,6 +331,16 @@ int isa_vga_mm_init(hwaddr vram_base,
                     hwaddr ctrl_base, int it_shift,
                     MemoryRegion *address_space);
 
+/* vgt_vga.c */
+extern int vgt_low_gm_sz;
+extern int vgt_high_gm_sz;
+extern int vgt_fence_sz;
+
+DeviceState *vgt_vga_init(PCIBus *pci_bus);
+void vgt_bridge_pci_conf_init(PCIDevice *dev);
+void vgt_bridge_pci_write(PCIDevice *dev,
+                          uint32_t address, uint32_t val, int len);
+
 /* ne2000.c */
 static inline bool isa_ne2000_init(ISABus *bus, int base, int irq, NICInfo *nd)
 {

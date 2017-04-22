@@ -2019,9 +2019,10 @@ static void select_vgahw(const char *p)
                 error_report("%s not available", ti->name);
                 exit(1);
             }
-            vga_interface_type = t;
-            break;
-        }
+	    vga_interface_type = t;
+	    printf("%s vga is %s\n", __func__, ti->opt_name);           
+	    break;
+	}
     }
     if (t == VGA_TYPE_MAX) {
     invalid_vga:
@@ -2041,6 +2042,7 @@ static void select_vgahw(const char *p)
         } else goto invalid_vga;
         opts = nextopt;
     }
+
 }
 
 typedef enum DisplayType {
@@ -4037,6 +4039,24 @@ int main(int argc, char **argv, char **envp)
                 if (vmstate_dump_file == NULL) {
                     error_report("open %s: %s", optarg, strerror(errno));
                     exit(1);
+                }
+                break;
+            case QEMU_OPTION_vgt_low_gm_sz:
+                {
+                    char *ptr;
+                    vgt_low_gm_sz = strtol(optarg, &ptr, 10);
+                }
+                break;
+            case QEMU_OPTION_vgt_high_gm_sz:
+                {
+                    char *ptr;
+                    vgt_high_gm_sz = strtol(optarg, &ptr, 10);
+                }
+                break;
+            case QEMU_OPTION_vgt_fence_sz:
+                {
+                    char *ptr;
+                    vgt_fence_sz = strtol(optarg, &ptr, 10);
                 }
                 break;
             default:
