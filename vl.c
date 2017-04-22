@@ -2041,6 +2041,11 @@ static VGAInterfaceInfo vga_interfaces[VGA_TYPE_MAX] = {
     [VGA_XENFB] = {
         .opt_name = "xenfb",
     },
+    [VGA_VGT] = {
+        .opt_name = "xengt",
+        .name = "Intel GVT-g",
+        .class_names = { "vgt-vga" },
+    },
 };
 
 static bool vga_interface_available(VGAInterfaceType t)
