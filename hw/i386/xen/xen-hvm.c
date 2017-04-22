@@ -196,7 +196,11 @@ static void xen_ram_init(PCMachineState *pcms,
         user_lowmem = HVM_BELOW_4G_RAM_END;
     }
 
-    if (ram_size >= user_lowmem) {
+    if (vgt_vga_enabled &&
+        ram_size >= 0xc0000000) {
+        pcms->above_4g_mem_size = ram_size - 0xc0000000;
+        pcms->below_4g_mem_size = 0xc0000000;
+    } else if (ram_size >= user_lowmem) {
         pcms->above_4g_mem_size = ram_size - user_lowmem;
         pcms->below_4g_mem_size = user_lowmem;
     } else {

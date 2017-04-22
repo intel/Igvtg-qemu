@@ -37,6 +37,7 @@
 #include "hw/i386/ioapic.h"
 #include "qapi/visitor.h"
 #include "qemu/error-report.h"
+#include "hw/display/vga.h"
 
 /*
  * I440FX chipset data sheet.
@@ -154,8 +155,8 @@ static void i440fx_update_memory_mappings(PCII440FXState *d)
 }
 
 
-static void i440fx_write_config(PCIDevice *dev,
-                                uint32_t address, uint32_t val, int len)
+void i440fx_write_config(PCIDevice *dev,
+                         uint32_t address, uint32_t val, int len)
 {
     PCII440FXState *d = I440FX_PCI_DEVICE(dev);
 
@@ -335,6 +336,10 @@ static void i440fx_realize(PCIDevice *dev, Error **errp)
 
     if (object_property_get_bool(qdev_get_machine(), "iommu", NULL)) {
         warn_report("i440fx doesn't support emulated iommu");
+    }
+
+    if (vgt_vga_enabled && xen_enabled()) {
+        vgt_bridge_pci_conf_init(dev);
     }
 }
 

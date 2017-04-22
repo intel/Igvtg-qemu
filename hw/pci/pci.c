@@ -24,6 +24,7 @@
 
 #include "qemu/osdep.h"
 #include "hw/hw.h"
+#include "hw/i386/pc.h"
 #include "hw/pci/pci.h"
 #include "hw/pci/pci_bridge.h"
 #include "hw/pci/pci_bus.h"
@@ -43,6 +44,7 @@
 #include "qapi/error.h"
 #include "qapi/qapi-commands-misc.h"
 #include "qemu/cutils.h"
+#include "hw/display/vga.h"
 
 //#define DEBUG_PCI
 #ifdef DEBUG_PCI
@@ -986,6 +988,10 @@ static PCIDevice *do_pci_register_device(PCIDevice *pci_dev,
     if (devfn < 0) {
         for(devfn = bus->devfn_min ; devfn < ARRAY_SIZE(bus->devices);
             devfn += PCI_FUNC_MAX) {
+            /* If vGT/XenGT is in use, reserve 00:02.* for the IGD */
+            if ((vgt_vga_enabled) && devfn == 0x10)
+                continue;
+
             if (pci_bus_devfn_available(bus, devfn) &&
                    !pci_bus_devfn_reserved(bus, devfn)) {
                 goto found;
@@ -1032,6 +1038,7 @@ static PCIDevice *do_pci_register_device(PCIDevice *pci_dev,
     pci_dev->irq_state = 0;
     pci_config_alloc(pci_dev);
 
+    printf("set vendor id(%x) for devfn(%x)\n", pc->vendor_id, devfn);
     pci_config_set_vendor_id(pci_dev->config, pc->vendor_id);
     pci_config_set_device_id(pci_dev->config, pc->device_id);
     pci_config_set_revision(pci_dev->config, pc->revision);
@@ -1068,6 +1075,11 @@ static PCIDevice *do_pci_register_device(PCIDevice *pci_dev,
         config_read = pci_default_read_config;
     if (!config_write)
         config_write = pci_default_write_config;
+    if (vgt_vga_enabled &&
+        config_write == i440fx_write_config) {
+        config_write = vgt_bridge_pci_write;
+    }
+
     pci_dev->config_read = config_read;
     pci_dev->config_write = config_write;
     bus->devices[devfn] = pci_dev;

@@ -56,6 +56,7 @@
 #include "migration/misc.h"
 #include "kvm_i386.h"
 #include "sysemu/numa.h"
+#include "hw/display/vga.h"
 
 #define MAX_IDE_BUS 2
 
@@ -228,7 +229,19 @@ static void pc_init1(MachineState *machine,
 
     pc_register_ferr_irq(pcms->gsi[13]);
 
-    pc_vga_init(isa_bus, pcmc->pci_enabled ? pci_bus : NULL);
+    /*
+     * Initialize XenGT hooks before normal VGA init. The
+     * ideal case is to have IGD presented as the primary
+     * graphics card in 00:02.0, and then have other emulated
+     * PCI VGA card all disabled. We still rely on Qemu to
+     * emulate legacy ISA ports, so requires the ISA vga logic.
+     */
+    if (vgt_vga_enabled && pcmc->pci_enabled) {
+        vgt_vga_init(pci_bus);
+        isa_create_simple(isa_bus, "isa-vga");
+    } else {
+        pc_vga_init(isa_bus, pcmc->pci_enabled ? pci_bus : NULL);
+    }
 
     assert(pcms->vmport != ON_OFF_AUTO__MAX);
     if (pcms->vmport == ON_OFF_AUTO_AUTO) {

@@ -70,4 +70,7 @@ extern const MemoryRegionOps pci_host_conf_be_ops;
 extern const MemoryRegionOps pci_host_data_le_ops;
 extern const MemoryRegionOps pci_host_data_be_ops;
 
+void i440fx_write_config(PCIDevice *dev,
+                         uint32_t address, uint32_t val, int len);
+
 #endif /* PCI_HOST_H */
