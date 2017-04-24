@@ -1,0 +1,9 @@
+#! /bin/bash
+./configure --prefix=/root	\
+    --enable-xen		\
+    --enable-debug-info	\
+    --enable-debug		\
+    --enable-sdl		\
+    --enable-vhost-net	\
+    --disable-debug-tcg	\
+    --target-list=x86_64-softmmu
