@@ -303,6 +303,9 @@ struct vfio_region_info_cap_type {
 /* Mdev sub-type for device state save and restore */
 #define VFIO_REGION_SUBTYPE_DEVICE_STATE	(4)
 
+/* Offset in region to save device state */
+#define VFIO_DEVICE_STATE_OFFSET	1
+
 #define VFIO_DEVICE_START	0
 #define VFIO_DEVICE_STOP	1
 
