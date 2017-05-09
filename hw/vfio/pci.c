@@ -37,6 +37,7 @@
 
 static void vfio_disable_interrupts(VFIOPCIDevice *vdev);
 static void vfio_mmap_set_enabled(VFIOPCIDevice *vdev, bool enabled);
+static VMStateDescription vfio_pci_vmstate;
 
 /*
  * Disabling BAR mmaping can be slow, but toggling it around INTx can
@@ -2813,6 +2814,17 @@ static void vfio_realize(PCIDevice *pdev, Error **errp)
         vfio_vga_quirk_setup(vdev);
     }
 
+    struct vfio_region_info *device_state;
+    /* device state region setup */
+    if (!vfio_get_dev_region_info(&vdev->vbasedev,
+                VFIO_REGION_TYPE_PCI_VENDOR_TYPE | PCI_VENDOR_ID_INTEL,
+                VFIO_REGION_SUBTYPE_DEVICE_STATE, &device_state)) {
+        memcpy(&vdev->device_state, device_state,
+               sizeof(struct vfio_region_info));
+        g_free(device_state);
+        vfio_pci_vmstate.unmigratable = 0;
+    }
+
     for (i = 0; i < PCI_ROM_SLOT; i++) {
         vfio_bar_quirk_setup(vdev, i);
     }
@@ -2994,7 +3006,7 @@ static Property vfio_pci_dev_properties[] = {
     DEFINE_PROP_END_OF_LIST(),
 };
 
-static const VMStateDescription vfio_pci_vmstate = {
+static VMStateDescription vfio_pci_vmstate = {
     .name = "vfio-pci",
     .unmigratable = 1,
 };
