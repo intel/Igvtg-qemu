@@ -38,6 +38,7 @@
 static void vfio_disable_interrupts(VFIOPCIDevice *vdev);
 static void vfio_mmap_set_enabled(VFIOPCIDevice *vdev, bool enabled);
 static VMStateDescription vfio_pci_vmstate;
+static void vfio_vm_change_state_handler(void *pv, int running, RunState state);
 
 /*
  * Disabling BAR mmaping can be slow, but toggling it around INTx can
@@ -2880,6 +2881,7 @@ static void vfio_realize(PCIDevice *pdev, Error **errp)
     vfio_register_err_notifier(vdev);
     vfio_register_req_notifier(vdev);
     vfio_setup_resetfn_quirk(vdev);
+    qemu_add_vm_change_state_handler(vfio_vm_change_state_handler, vdev);
 
     return;
 
@@ -2960,6 +2962,24 @@ static void vfio_pci_reset(DeviceState *dev)
 
 post_reset:
     vfio_pci_post_reset(vdev);
+}
+
+static void vfio_vm_change_state_handler(void *pv, int running, RunState state)
+{
+    VFIOPCIDevice *vdev = pv;
+    VFIODevice *vbasedev = &vdev->vbasedev;
+    uint8_t dev_state;
+    uint8_t sz = 1;
+
+    dev_state = running ? VFIO_DEVICE_START : VFIO_DEVICE_STOP;
+
+    if (pwrite(vdev->vbasedev.fd, &dev_state,
+               sz, vdev->device_state.offset) != sz) {
+        error_report("vfio: Failed to %s device", running ? "start" : "stop");
+        return;
+    }
+
+    vbasedev->device_state = dev_state;
 }
 
 static void vfio_instance_init(Object *obj)
