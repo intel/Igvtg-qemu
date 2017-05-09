@@ -123,6 +123,7 @@ typedef struct VFIODevice {
     unsigned int num_irqs;
     unsigned int num_regions;
     unsigned int flags;
+    bool device_state;
 } VFIODevice;
 
 struct VFIODeviceOps {
