@@ -2961,6 +2961,123 @@ static void vfio_vm_change_state_handler(void *pv, int running, RunState state)
     vbasedev->device_state = dev_state;
 }
 
+static int vfio_device_put(QEMUFile *f, void *pv, size_t size,
+                           VMStateField *field, QJSON *vmdesc)
+{
+    VFIOPCIDevice *vdev = pv;
+    PCIDevice *pdev = &vdev->pdev;
+    int sz = vdev->device_state.size - VFIO_DEVICE_STATE_OFFSET;
+    uint8_t *buf = NULL;
+    uint32_t msi_cfg, msi_lo, msi_hi, msi_data, bar_cfg, i;
+    bool msi_64bit;
+
+    for (i = 0; i < PCI_ROM_SLOT; i++) {
+        bar_cfg = pci_default_read_config(pdev, PCI_BASE_ADDRESS_0 + i * 4, 4);
+        qemu_put_be32(f, bar_cfg);
+    }
+
+    msi_cfg = pci_default_read_config(pdev, pdev->msi_cap + PCI_MSI_FLAGS, 2);
+    msi_64bit = !!(msi_cfg & PCI_MSI_FLAGS_64BIT);
+
+    msi_lo = pci_default_read_config(pdev,
+                                     pdev->msi_cap + PCI_MSI_ADDRESS_LO, 4);
+    qemu_put_be32(f, msi_lo);
+
+    if (msi_64bit) {
+        msi_hi = pci_default_read_config(pdev,
+                                         pdev->msi_cap + PCI_MSI_ADDRESS_HI,
+                                         4);
+        qemu_put_be32(f, msi_hi);
+    }
+
+    msi_data = pci_default_read_config(pdev,
+               pdev->msi_cap + (msi_64bit ? PCI_MSI_DATA_64 : PCI_MSI_DATA_32),
+               2);
+    qemu_put_be32(f, msi_data);
+
+    buf = g_malloc(sz);
+    if (buf == NULL) {
+        error_report("vfio: Failed to allocate memory for migrate");
+        goto exit;
+    }
+
+    if (pread(vdev->vbasedev.fd, buf, sz,
+              vdev->device_state.offset + VFIO_DEVICE_STATE_OFFSET) != sz) {
+        error_report("vfio: Failed to read Device State Region");
+        goto exit;
+    }
+
+    qemu_put_buffer(f, buf, sz);
+
+exit:
+    g_free(buf);
+
+    return 0;
+}
+
+static int vfio_device_get(QEMUFile *f, void *pv,
+                           size_t size, VMStateField *field)
+{
+    VFIOPCIDevice *vdev = pv;
+    PCIDevice *pdev = &vdev->pdev;
+    int sz = vdev->device_state.size - VFIO_DEVICE_STATE_OFFSET;
+    uint8_t *buf = NULL;
+    uint32_t ctl, msi_lo, msi_hi, msi_data, bar_cfg, i;
+    bool msi_64bit;
+
+    /* retore pci bar configuration */
+    ctl = pci_default_read_config(pdev, PCI_COMMAND, 2);
+    vfio_pci_write_config(pdev, PCI_COMMAND,
+                          ctl & (!(PCI_COMMAND_IO | PCI_COMMAND_MEMORY)), 2);
+    for (i = 0; i < PCI_ROM_SLOT; i++) {
+        bar_cfg = qemu_get_be32(f);
+        vfio_pci_write_config(pdev, PCI_BASE_ADDRESS_0 + i * 4, bar_cfg, 4);
+    }
+    vfio_pci_write_config(pdev, PCI_COMMAND,
+                          ctl | PCI_COMMAND_IO | PCI_COMMAND_MEMORY, 2);
+
+    /* restore msi configuration */
+    ctl = pci_default_read_config(pdev, pdev->msi_cap + PCI_MSI_FLAGS, 2);
+    msi_64bit = !!(ctl & PCI_MSI_FLAGS_64BIT);
+
+    vfio_pci_write_config(&vdev->pdev,
+                          pdev->msi_cap + PCI_MSI_FLAGS,
+                          ctl & (!PCI_MSI_FLAGS_ENABLE), 2);
+
+    msi_lo = qemu_get_be32(f);
+    vfio_pci_write_config(pdev, pdev->msi_cap + PCI_MSI_ADDRESS_LO, msi_lo, 4);
+
+    if (msi_64bit) {
+        msi_hi = qemu_get_be32(f);
+        vfio_pci_write_config(pdev, pdev->msi_cap + PCI_MSI_ADDRESS_HI,
+                              msi_hi, 4);
+    }
+    msi_data = qemu_get_be32(f);
+    vfio_pci_write_config(pdev,
+              pdev->msi_cap + (msi_64bit ? PCI_MSI_DATA_64 : PCI_MSI_DATA_32),
+              msi_data, 2);
+
+    vfio_pci_write_config(&vdev->pdev, pdev->msi_cap + PCI_MSI_FLAGS,
+                          ctl | PCI_MSI_FLAGS_ENABLE, 2);
+
+    buf = g_malloc(sz);
+    if (buf == NULL) {
+        error_report("vfio: Failed to allocate memory for migrate");
+        return -1;
+    }
+
+    qemu_get_buffer(f, buf, sz);
+    if (pwrite(vdev->vbasedev.fd, buf, sz,
+               vdev->device_state.offset + VFIO_DEVICE_STATE_OFFSET) != sz) {
+        error_report("vfio: Failed to write Device State Region");
+        return -1;
+    }
+
+    g_free(buf);
+
+    return 0;
+}
+
 static void vfio_instance_init(Object *obj)
 {
     PCIDevice *pci_dev = PCI_DEVICE(obj);
@@ -3005,9 +3122,29 @@ static Property vfio_pci_dev_properties[] = {
     DEFINE_PROP_END_OF_LIST(),
 };
 
+static const VMStateInfo vfio_vmstate_info = {
+    .name = "vfio-state",
+    .get = vfio_device_get,
+    .put = vfio_device_put,
+};
+
 static VMStateDescription vfio_pci_vmstate = {
     .name = "vfio-pci",
     .unmigratable = 1,
+    .version_id = 1,
+    .minimum_version_id = 1,
+    .fields = (VMStateField[]) {
+        {
+            .name         = "vfio dev",
+            .version_id   = 0,
+            .field_exists = NULL,
+            .size         = 0,
+            .info         = &vfio_vmstate_info,
+            .flags        = VMS_SINGLE,
+            .offset       = 0,
+         },
+        VMSTATE_END_OF_LIST()
+    },
 };
 
 static void vfio_pci_dev_class_init(ObjectClass *klass, void *data)
