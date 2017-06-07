@@ -2539,6 +2539,13 @@ EOF
   libs_softmmu="$sdl_libs $libs_softmmu"
 fi
 
+if test "$sdl" = "yes" ; then
+  vgpu_cflags=`$pkg_config --cflags egl 2> /dev/null`
+  vgpu_libs=`$pkg_config --libs libdrm sdl gl egl libudev 2> /dev/null`
+  QEMU_CFLAGS="$QEMU_CFLAGS $vgpu_cflags"
+  libs_softmmu="$libs_softmmu $vgpu_libs"
+fi
+
 ##########################################
 # RDMA needs OpenFabrics libraries
 if test "$rdma" != "no" ; then

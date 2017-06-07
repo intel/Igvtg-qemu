@@ -51,6 +51,13 @@ struct vfio_as_head vfio_address_spaces =
 static int vfio_kvm_device_fd = -1;
 #endif
 
+static uint32_t kvmgt_dmabuf_mgr_fd = 0;
+uint32_t vfio_get_dmabuf_mgr_fd(void)
+{
+    printf("vfio: return dmabuf mgr fd:%d\n", kvmgt_dmabuf_mgr_fd);
+    return kvmgt_dmabuf_mgr_fd;
+}
+
 /*
  * Common VFIO interrupt disable
  */
@@ -1205,6 +1212,7 @@ int vfio_get_device(VFIOGroup *group, const char *name,
 {
     struct vfio_device_info dev_info = { .argsz = sizeof(dev_info) };
     int ret, fd;
+    uint32_t type;
 
     fd = ioctl(group->fd, VFIO_GROUP_GET_DEVICE_FD, name);
     if (fd < 0) {
@@ -1229,6 +1237,15 @@ int vfio_get_device(VFIOGroup *group, const char *name,
     vbasedev->num_irqs = dev_info.num_irqs;
     vbasedev->num_regions = dev_info.num_regions;
     vbasedev->flags = dev_info.flags;
+
+    type = 0; //INTEL_VGPU_DMABUF_MGR_FD;
+    ret = ioctl(fd, VFIO_DEVICE_GET_FD, &type);
+    if (ret <= 0) {
+        error_report("vfio: get dmabuf mgr fd failed:%d\n", ret);
+    } else {
+        kvmgt_dmabuf_mgr_fd = ret;
+        printf("vfio: dmabuf mgr fd:%d\n", ret);
+    }
 
     trace_vfio_get_device(name, dev_info.flags, dev_info.num_regions,
                           dev_info.num_irqs);

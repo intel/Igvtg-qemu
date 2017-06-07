@@ -64,6 +64,12 @@ static int scaling_active = 0;
 static Notifier mouse_mode_notifier;
 static int idle_counter;
 
+void handle_keydown(SDL_Event *ev);
+void handle_keyup(SDL_Event *ev);
+void handle_mousemotion(SDL_Event *ev);
+void handle_mousebutton(SDL_Event *ev);
+void handle_activation(SDL_Event *ev);
+
 #define SDL_REFRESH_INTERVAL_BUSY 10
 #define SDL_MAX_IDLE_COUNT (2 * GUI_REFRESH_INTERVAL_DEFAULT \
                             / SDL_REFRESH_INTERVAL_BUSY + 1)
@@ -552,7 +558,7 @@ static void toggle_full_screen(void)
     graphic_hw_update(NULL);
 }
 
-static void handle_keydown(SDL_Event *ev)
+void handle_keydown(SDL_Event *ev)
 {
     int mod_state;
     int keycode;
@@ -698,7 +704,7 @@ static void handle_keydown(SDL_Event *ev)
     }
 }
 
-static void handle_keyup(SDL_Event *ev)
+void handle_keyup(SDL_Event *ev)
 {
     int mod_state;
 
@@ -730,7 +736,7 @@ static void handle_keyup(SDL_Event *ev)
     }
 }
 
-static void handle_mousemotion(SDL_Event *ev)
+void handle_mousemotion(SDL_Event *ev)
 {
     int max_x, max_y;
 
@@ -754,7 +760,7 @@ static void handle_mousemotion(SDL_Event *ev)
     }
 }
 
-static void handle_mousebutton(SDL_Event *ev)
+void handle_mousebutton(SDL_Event *ev)
 {
     int buttonstate = SDL_GetMouseState(NULL, NULL);
     SDL_MouseButtonEvent *bev;
@@ -779,7 +785,7 @@ static void handle_mousebutton(SDL_Event *ev)
     }
 }
 
-static void handle_activation(SDL_Event *ev)
+void handle_activation(SDL_Event *ev)
 {
 #ifdef _WIN32
     /* Disable grab if the window no longer has the focus

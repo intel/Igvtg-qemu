@@ -427,6 +427,7 @@ void surface_gl_setup_viewport(ConsoleGLState *gls,
 #ifdef CONFIG_SDL
 void sdl_display_early_init(int opengl);
 void sdl_display_init(DisplayState *ds, int full_screen, int no_frame);
+void intel_vgpu_display_init(DisplayState *ds, int full_screen, int no_frame);
 #else
 static inline void sdl_display_early_init(int opengl)
 {

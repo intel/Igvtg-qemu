@@ -4525,7 +4525,10 @@ int main(int argc, char **argv, char **envp)
         curses_display_init(ds, full_screen);
         break;
     case DT_SDL:
+#if 0
         sdl_display_init(ds, full_screen, no_frame);
+#endif
+        intel_vgpu_display_init(ds, full_screen, no_frame);
         break;
     case DT_COCOA:
         cocoa_display_init(ds, full_screen);

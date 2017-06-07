@@ -175,4 +175,6 @@ int vfio_spapr_create_window(VFIOContainer *container,
 int vfio_spapr_remove_window(VFIOContainer *container,
                              hwaddr offset_within_address_space);
 
+uint32_t vfio_get_dmabuf_mgr_fd(void);
+
 #endif /* HW_VFIO_VFIO_COMMON_H */
