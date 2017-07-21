@@ -282,6 +282,7 @@ static bool blkverify_recurse_is_first_non_filter(BlockDriverState *bs,
 
 static void blkverify_refresh_filename(BlockDriverState *bs, QDict *options)
 {
+    const char* verifyFormatter = "blkverify:%s:%s";
     BDRVBlkverifyState *s = bs->opaque;
 
     /* bs->file->bs has already been refreshed */
@@ -305,8 +306,8 @@ static void blkverify_refresh_filename(BlockDriverState *bs, QDict *options)
     if (bs->file->bs->exact_filename[0]
         && s->test_file->bs->exact_filename[0])
     {
-        snprintf(bs->exact_filename, sizeof(bs->exact_filename),
-                 "blkverify:%s:%s",
+        snprintf(bs->exact_filename, sizeof(bs->exact_filename) + sizeof(verifyFormatter),
+                 verifyFormatter,
                  bs->file->bs->exact_filename,
                  s->test_file->bs->exact_filename);
     }
