@@ -484,6 +484,39 @@ struct vfio_pci_hot_reset {
 
 #define VFIO_DEVICE_PCI_HOT_RESET	_IO(VFIO_TYPE, VFIO_BASE + 13)
 
+/**
+ * VFIO_DEVICE_QUERY_GFX_PLANE - _IOW(VFIO_TYPE, VFIO_BASE + 14, struct vfio_device_query_gfx_plane)
+ *
+ * Set the drm_plane_type and retrieve information about the gfx plane.
+ *
+ * Return: 0 on success, -errno on failure.
+ */
+struct vfio_device_gfx_plane_info {
+	__u32 argsz;
+	__u32 flags;
+#define VFIO_GFX_PLANE_TYPE_PROBE (1 << 0)
+#define VFIO_GFX_PLANE_TYPE_DMABUF (1 << 1)
+#define VFIO_GFX_PLANE_TYPE_REGION (1 << 2)
+
+	/* in */
+	__u32 drm_plane_type;	/* type of plane: DRM_PLANE_TYPE_* */
+	/* out */
+	__u32 drm_format;	/* drm format of plane */
+	__u64 drm_format_mod;
+	__u32 width;	/* width of plane */
+	__u32 height;	/* height of plane */
+	__u32 stride;	/* stride of plane */
+	__u32 size;	/* size of plane in bytes, align on page*/
+	__u32 x_pos;	/* horizontal position of cursor plane, upper left corner in pixels */
+	__u32 y_pos;	/* vertical position of cursor plane, upper left corner in lines*/
+	union {
+		__u32 region_index;
+		__s32 fd;	/* dma-buf fd */
+	};
+};
+
+#define VFIO_DEVICE_QUERY_GFX_PLANE _IO(VFIO_TYPE, VFIO_BASE + 14)
+
 /* -------- API for Type1 VFIO IOMMU -------- */
 
 /**

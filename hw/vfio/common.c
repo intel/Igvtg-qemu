@@ -52,6 +52,13 @@ struct vfio_as_head vfio_address_spaces =
 static int vfio_kvm_device_fd = -1;
 #endif
 
+static uint32_t kvmgt_dmabuf_device_fd = 0;
+uint32_t vfio_get_dmabuf_device_fd(void)
+{
+    printf("vfio: return dmabuf device fd:%d\n", kvmgt_dmabuf_device_fd);
+    return kvmgt_dmabuf_device_fd;
+}
+
 /*
  * Common VFIO interrupt disable
  */
@@ -1271,6 +1278,8 @@ int vfio_get_device(VFIOGroup *group, const char *name,
     vbasedev->num_irqs = dev_info.num_irqs;
     vbasedev->num_regions = dev_info.num_regions;
     vbasedev->flags = dev_info.flags;
+
+    kvmgt_dmabuf_device_fd = fd;
 
     trace_vfio_get_device(name, dev_info.flags, dev_info.num_regions,
                           dev_info.num_irqs);
