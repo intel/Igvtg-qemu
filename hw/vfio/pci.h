@@ -146,6 +146,12 @@ typedef struct VFIOPCIDevice {
     bool no_kvm_intx;
     bool no_kvm_msi;
     bool no_kvm_msix;
+    /* vgpu local display */
+    QemuConsole *display_con;
+    uint32_t region_index;
+    uint32_t region_size;
+    void *region_mmap;
+    DisplaySurface *region_surface;
 } VFIOPCIDevice;
 
 uint32_t vfio_pci_read_config(PCIDevice *pdev, uint32_t addr, int len);
