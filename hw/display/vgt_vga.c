@@ -372,6 +372,112 @@ DeviceState *vgt_vga_init(PCIBus *pci_bus)
     return DEVICE(dev);
 }
 
+static void read_write_state(QEMUFile *f, VGTVGAState *d, bool is_read)
+{
+    char file_name[PATH_MAX] = {0};
+    FILE *fp = NULL;
+    struct stat st;
+    int sz;
+    uint8_t *buf = NULL;
+    int count = 0;
+
+    snprintf(file_name, PATH_MAX, "/sys/kernel/vgt/vm%d/device_state", d->domid);
+
+    fp = fopen(file_name, "r+");
+    if (fp == NULL) {
+        qemu_log("vGT: %s failed to open file %s! errno = %d",
+                __func__, file_name, errno);
+        goto EXIT;
+    }
+
+    fstat(fileno(fp), &st);
+    sz = st.st_size;
+
+    if (sz <= 0) {
+        qemu_log("vGT: failed to achieve file size. file name=%s",
+               file_name);
+        goto EXIT;
+    }
+
+    buf = g_malloc(sz);
+    if (buf == NULL) {
+        qemu_log("vGT: %s failed to allocate memory size %d! errno = %d",
+                __func__, sz, errno);
+        goto EXIT;
+    }
+
+    DPRINTF("Allocate %d size of buffer for device state\n", sz);
+
+    if (is_read) {
+        count = fread(buf, 1, sz, fp);
+        qemu_put_buffer(f, buf, sz);
+    } else {
+        qemu_get_buffer(f, buf, sz);
+        count = fwrite(buf, 1, sz, fp);
+    }
+
+    if (count != sz) {
+        qemu_log("vGT: read/write snapshot file size is differ %d:%d",
+                count, sz);
+    }
+
+    DPRINTF("[%s] %d size of buffer for device state\n",
+            is_read ? "READ":"WRITE", count);
+
+EXIT:
+    g_free(buf);
+    if (fp) {
+        fclose(fp);
+    }
+    return;
+}
+
+static int vgt_device_get(QEMUFile *f, void *pv,
+                          size_t size, VMStateField *field)
+{
+    VGTVGAState *d = (VGTVGAState *) pv;
+
+    read_write_state(f, d, false);
+
+    return 0;
+}
+
+static int vgt_device_put(QEMUFile *f, void *pv, size_t size,
+                          VMStateField *field, QJSON *vmdesc)
+{
+    VGTVGAState *d = (VGTVGAState *) pv;
+
+    read_write_state(f, d, true);
+
+    destroy_vgt_instance(d->domid);
+    return 0;
+}
+
+static const VMStateInfo vmstate_info_vgt = {
+    .name = "vgt state",
+    .get  = vgt_device_get,
+    .put  = vgt_device_put,
+};
+
+static const VMStateDescription vmstate_vga_vgt = {
+    .name = "vgt-vga",
+    .version_id = 2,
+    .minimum_version_id = 2,
+    .fields = (VMStateField[]) {
+        {
+            .name         = "vgt dev",
+            .version_id   = 0,
+            .field_exists = NULL,
+            .size         = 0,
+            .info         = &vmstate_info_vgt,
+            .flags        = VMS_SINGLE,
+            .offset       = 0,
+        },
+
+        VMSTATE_END_OF_LIST()
+    }
+};
+
 static void vgt_class_initfn(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
@@ -379,7 +485,7 @@ static void vgt_class_initfn(ObjectClass *klass, void *data)
     ic->realize = vgt_initfn;
     dc->reset = vgt_reset;
     ic->exit = vgt_cleanupfn;
-    dc->vmsd = &vmstate_vga_common;
+    dc->vmsd = &vmstate_vga_vgt;
 }
 
 static TypeInfo vgt_info = {
