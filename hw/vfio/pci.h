@@ -19,6 +19,7 @@
 #include "qemu/event_notifier.h"
 #include "qemu/queue.h"
 #include "qemu/timer.h"
+#include "ui/console.h"
 
 #define PCI_ANY_ID (~0)
 
@@ -98,6 +99,14 @@ typedef struct VFIOMSIXInfo {
     unsigned long *pending;
 } VFIOMSIXInfo;
 
+typedef struct VFIODMABuf VFIODMABuf;
+struct VFIODMABuf {
+    QemuDmaBuf  buf;
+    uint32_t pos_x, pos_y;
+    int dmabuf_id;
+    QTAILQ_ENTRY(VFIODMABuf) next;
+};
+
 typedef struct VFIOPCIDevice {
     PCIDevice pdev;
     VFIODevice vbasedev;
@@ -152,6 +161,9 @@ typedef struct VFIOPCIDevice {
     uint32_t region_size;
     void *region_mmap;
     DisplaySurface *region_surface;
+    QTAILQ_HEAD(, VFIODMABuf) dmabufs;
+    VFIODMABuf *primary;
+    VFIODMABuf *cursor;
 } VFIOPCIDevice;
 
 uint32_t vfio_pci_read_config(PCIDevice *pdev, uint32_t addr, int len);

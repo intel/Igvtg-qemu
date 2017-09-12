@@ -18,6 +18,195 @@
 #include "ui/console.h"
 #include "pci.h"
 
+/* FIXME */
+#ifndef DRM_PLANE_TYPE_PRIMARY
+# define DRM_PLANE_TYPE_PRIMARY 1
+# define DRM_PLANE_TYPE_CURSOR  2
+#endif
+
+/*
+ * ui/console.c calls this to poll for updates.
+ * Typically 30 calls per second (GUI_REFRESH_INTERVAL_DEFAULT).
+ *
+ * Using this is not required though, in case there is some kind of
+ * notification support it is also possible to call the dpy_gl_*
+ * functions in other code paths and leave this function empty.
+ */
+static VFIODMABuf *vfio_display_get_dmabuf(VFIOPCIDevice *vdev,
+                                           uint32_t plane_type)
+{
+    struct vfio_device_gfx_plane_info plane;
+    struct vfio_device_gfx_dmabuf_fd gfd;
+    VFIODMABuf *dmabuf;
+    static int errcnt;
+    int ret;
+
+    memset(&plane, 0, sizeof(plane));
+    plane.argsz = sizeof(plane);
+    plane.flags = VFIO_GFX_PLANE_TYPE_DMABUF;
+    plane.drm_plane_type = plane_type;
+    ret = ioctl(vdev->vbasedev.fd, VFIO_DEVICE_QUERY_GFX_PLANE, &plane);
+    if (ret < 0) {
+        fprintf(stderr, "(%d) ioctl VFIO_DEVICE_QUERY_GFX_PLANE(%s): %s\r",
+                ++errcnt,
+                (plane_type == DRM_PLANE_TYPE_PRIMARY) ? "primary" : "cursor",
+                strerror(errno));
+        fflush(stderr);
+        return NULL;
+    }
+    if (!plane.drm_format || !plane.size) {
+        fprintf(stderr, "(%d) %s plane not initialized by guest\r",
+                ++errcnt,
+                (plane_type == DRM_PLANE_TYPE_PRIMARY) ? "primary" : "cursor");
+        fflush(stderr);
+        return NULL;
+    }
+
+    QTAILQ_FOREACH(dmabuf, &vdev->dmabufs, next) {
+        if (dmabuf->dmabuf_id == plane.dmabuf_id) {
+            /* found in list, move to head, return it */
+            QTAILQ_REMOVE(&vdev->dmabufs, dmabuf, next);
+            QTAILQ_INSERT_HEAD(&vdev->dmabufs, dmabuf, next);
+            if (plane_type == DRM_PLANE_TYPE_CURSOR) {
+                dmabuf->pos_x      = plane.x_pos;
+                dmabuf->pos_y      = plane.y_pos;
+            }
+#if 1
+            if (plane.width != dmabuf->buf.width ||
+                plane.height != dmabuf->buf.height) {
+                fprintf(stderr, "%s: cached dmabuf mismatch: id %d, "
+                        "kernel %dx%d, cached %dx%d, plane %s\n",
+                        __func__, plane.dmabuf_id,
+                        plane.width, plane.height,
+                        dmabuf->buf.width, dmabuf->buf.height,
+                        (plane_type == DRM_PLANE_TYPE_PRIMARY)
+                        ? "primary" : "cursor");
+                abort();
+            }
+#endif
+            return dmabuf;
+        }
+    }
+
+    memset(&gfd, 0, sizeof(gfd));
+    gfd.argsz = sizeof(gfd);
+    gfd.dmabuf_id = plane.dmabuf_id;
+    ret = ioctl(vdev->vbasedev.fd, VFIO_DEVICE_GET_GFX_DMABUF, &gfd);
+    if (ret < 0) {
+        fprintf(stderr, "(%d) ioctl VFIO_DEVICE_GET_GFX_DMABUF: %s\r",
+                ++errcnt, strerror(errno));
+        return NULL;
+    }
+
+    fprintf(stderr, "%s: new dmabuf: id %d, res %dx%d, "
+            "format %c%c%c%c, plane %s, fd %d, hot +%d+%d\n",
+            __func__, plane.dmabuf_id,
+            plane.width, plane.height,
+            (plane.drm_format >>  0) & 0xff,
+            (plane.drm_format >>  8) & 0xff,
+            (plane.drm_format >> 16) & 0xff,
+            (plane.drm_format >> 24) & 0xff,
+            (plane_type == DRM_PLANE_TYPE_PRIMARY) ? "primary" : "cursor",
+            gfd.dmabuf_fd,
+            plane.x_pos, plane.y_pos);
+
+    dmabuf = g_new0(VFIODMABuf, 1);
+    dmabuf->dmabuf_id  = plane.dmabuf_id;
+    dmabuf->buf.width  = plane.width;
+    dmabuf->buf.height = plane.height;
+    dmabuf->buf.stride = plane.stride;
+    dmabuf->buf.fourcc = plane.drm_format;
+    dmabuf->buf.fd     = gfd.dmabuf_fd;
+    if (plane_type == DRM_PLANE_TYPE_CURSOR) {
+        dmabuf->pos_x      = plane.x_pos;
+        dmabuf->pos_y      = plane.y_pos;
+    }
+
+    QTAILQ_INSERT_HEAD(&vdev->dmabufs, dmabuf, next);
+    return dmabuf;
+}
+
+static void vfio_display_free_dmabufs(VFIOPCIDevice *vdev)
+{
+    char log[128]; int pos = 0;
+    VFIODMABuf *dmabuf, *tmp;
+    uint32_t keep = 5;
+
+    QTAILQ_FOREACH_SAFE(dmabuf, &vdev->dmabufs, next, tmp) {
+        if (keep > 0) {
+            pos += sprintf(log + pos, " %d", dmabuf->buf.fd);
+            keep--;
+            continue;
+        }
+        assert(dmabuf != vdev->primary);
+        QTAILQ_REMOVE(&vdev->dmabufs, dmabuf, next);
+        fprintf(stderr, "%s: free dmabuf: fd %d (keep%s)\n",
+                __func__, dmabuf->buf.fd, log);
+        dpy_gl_release_dmabuf(vdev->display_con, &dmabuf->buf);
+        close(dmabuf->buf.fd);
+        g_free(dmabuf);
+    }
+}
+
+static void vfio_display_dmabuf_update(void *opaque)
+{
+    VFIOPCIDevice *vdev = opaque;
+    VFIODMABuf *primary, *cursor;
+    bool free_bufs = false;
+
+    primary = vfio_display_get_dmabuf(vdev, DRM_PLANE_TYPE_PRIMARY);
+    if (primary == NULL) {
+        return;
+    }
+
+    if (vdev->primary != primary) {
+        vdev->primary = primary;
+        qemu_console_resize(vdev->display_con,
+                            primary->buf.width, primary->buf.height);
+        dpy_gl_scanout_dmabuf(vdev->display_con,
+                              &primary->buf);
+        free_bufs = true;
+    }
+
+    cursor = vfio_display_get_dmabuf(vdev, DRM_PLANE_TYPE_CURSOR);
+    if (vdev->cursor != cursor) {
+        vdev->cursor = cursor;
+        dpy_gl_cursor_dmabuf(vdev->display_con,
+                             &cursor->buf);
+        free_bufs = true;
+    }
+    if (cursor != NULL) {
+        dpy_gl_cursor_position(vdev->display_con,
+                               cursor->pos_x,
+                               cursor->pos_y);
+    }
+
+    dpy_gl_update(vdev->display_con, 0, 0,
+                  primary->buf.width, primary->buf.height);
+
+    if (free_bufs) {
+        vfio_display_free_dmabufs(vdev);
+    }
+}
+
+static const GraphicHwOps vfio_display_dmabuf_ops = {
+    .gfx_update = vfio_display_dmabuf_update,
+};
+
+static int vfio_display_dmabuf_init(VFIOPCIDevice *vdev, Error **errp)
+{
+    if (!display_opengl) {
+        error_setg(errp, "vfio-display-dmabuf: opengl not available");
+        return -1;
+    }
+
+    vdev->display_con = graphic_console_init(DEVICE(vdev), 0,
+                                             &vfio_display_dmabuf_ops,
+                                             vdev);
+    /* TODO: disable hotplug (there is no graphic_console_close) */
+    return 0;
+}
+
 /* ---------------------------------------------------------------------- */
 
 static void vfio_display_region_update(void *opaque)
@@ -121,8 +310,7 @@ int vfio_display_probe(VFIOPCIDevice *vdev, Error **errp)
     probe.flags = VFIO_GFX_PLANE_TYPE_PROBE | VFIO_GFX_PLANE_TYPE_DMABUF;
     ret = ioctl(vdev->vbasedev.fd, VFIO_DEVICE_QUERY_GFX_PLANE, &probe);
     if (ret == 0) {
-        error_setg(errp, "vfio-display: dmabuf support not implemented yet");
-        return -1;
+        return vfio_display_dmabuf_init(vdev, errp);
     }
 
     memset(&probe, 0, sizeof(probe));
