@@ -16,6 +16,8 @@ typedef struct egl_fb {
     bool delete_texture;
 } egl_fb;
 
+void egl_log_error(const char *func, const char *call);
+
 void egl_fb_destroy(egl_fb *fb);
 void egl_fb_setup_default(egl_fb *fb, int width, int height);
 void egl_fb_setup_for_tex(egl_fb *fb, int width, int height,
