@@ -27,6 +27,39 @@ EGLConfig qemu_egl_config;
 
 /* ------------------------------------------------------------------ */
 
+void egl_log_error(const char *func, const char *call)
+{
+    struct {
+        int num;
+        const char *name;
+    } glerr[] = {
+        { .num = GL_INVALID_ENUM,       .name = "GL_INVALID_ENUM"       },
+        { .num = GL_INVALID_VALUE,      .name = "GL_INVALID_VALUE"      },
+        { .num = GL_INVALID_OPERATION,  .name = "GL_INVALID_OPERATION"  },
+        { .num = GL_STACK_OVERFLOW,     .name = "GL_STACK_OVERFLOW"     },
+        { .num = GL_STACK_UNDERFLOW,    .name = "GL_STACK_UNDERFLOW"    },
+        { .num = GL_OUT_OF_MEMORY,      .name = "GL_OUT_OF_MEMORY"      },
+    };
+    GLenum err;
+    const char *ename;
+    int i;
+
+    while ((err = glGetError()) != GL_NO_ERROR) {
+        if (!func || !call) {
+            continue;
+        }
+        ename = "unknown";
+        for (i = 0; i < ARRAY_SIZE(glerr); i++) {
+            if (err == glerr[i].num) {
+                ename = glerr[i].name;
+            }
+        }
+        fprintf(stderr, "%s: %s: %s (0x%x)\n", func, call, ename, err);
+    }
+}
+
+/* ------------------------------------------------------------------ */
+
 static void egl_fb_delete_texture(egl_fb *fb)
 {
     if (!fb->delete_texture) {
