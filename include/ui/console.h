@@ -234,8 +234,9 @@ typedef struct DisplayChangeListenerOps {
     void (*dpy_gl_scanout_dmabuf)(DisplayChangeListener *dcl,
                                   QemuDmaBuf *dmabuf);
     void (*dpy_gl_cursor_dmabuf)(DisplayChangeListener *dcl,
-                                 QemuDmaBuf *dmabuf,
-                                 uint32_t pos_x, uint32_t pos_y);
+                                 QemuDmaBuf *dmabuf);
+    void (*dpy_gl_cursor_position)(DisplayChangeListener *dcl,
+                                   uint32_t pos_x, uint32_t pos_y);
     void (*dpy_gl_release_dmabuf)(DisplayChangeListener *dcl,
                                   QemuDmaBuf *dmabuf);
     void (*dpy_gl_update)(DisplayChangeListener *dcl,
@@ -309,8 +310,9 @@ void dpy_gl_scanout_texture(QemuConsole *con,
 void dpy_gl_scanout_dmabuf(QemuConsole *con,
                            QemuDmaBuf *dmabuf);
 void dpy_gl_cursor_dmabuf(QemuConsole *con,
-                          QemuDmaBuf *dmabuf,
-                          uint32_t pos_x, uint32_t pos_y);
+                          QemuDmaBuf *dmabuf);
+void dpy_gl_cursor_position(QemuConsole *con,
+                            uint32_t pos_x, uint32_t pos_y);
 void dpy_gl_release_dmabuf(QemuConsole *con,
                            QemuDmaBuf *dmabuf);
 void dpy_gl_update(QemuConsole *con,
