@@ -116,6 +116,8 @@ static VFIODMABuf *vfio_display_get_dmabuf(VFIOPCIDevice *vdev,
     if (plane_type == DRM_PLANE_TYPE_CURSOR) {
         dmabuf->pos_x      = plane.x_pos;
         dmabuf->pos_y      = plane.y_pos;
+        dmabuf->hot_x      = plane.x_hot;
+        dmabuf->hot_y      = plane.y_hot;
     }
 
     QTAILQ_INSERT_HEAD(&vdev->dmabufs, dmabuf, next);
@@ -172,7 +174,12 @@ static void vfio_display_dmabuf_update(void *opaque)
         free_bufs = true;
     }
     if (cursor != NULL) {
+        bool have_hot = (cursor->hot_x != 0xffffffff &&
+                         cursor->hot_y != 0xffffffff);
         dpy_gl_cursor_position(vdev->display_con,
+                               have_hot, true,
+                               cursor->hot_x,
+                               cursor->hot_y,
                                cursor->pos_x,
                                cursor->pos_y);
     }
