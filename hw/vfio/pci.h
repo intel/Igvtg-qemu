@@ -103,6 +103,7 @@ typedef struct VFIODMABuf VFIODMABuf;
 struct VFIODMABuf {
     QemuDmaBuf  buf;
     uint32_t pos_x, pos_y;
+    uint32_t hot_x, hot_y;
     int dmabuf_id;
     QTAILQ_ENTRY(VFIODMABuf) next;
 };
