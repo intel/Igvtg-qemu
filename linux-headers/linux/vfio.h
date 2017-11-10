@@ -519,8 +519,13 @@ struct vfio_pci_hot_reset {
  *   with each call to query the plane info.
  * - Others are invalid and return -EINVAL.
  *
- * Return: 0 on success, -ENODEV with all out fields zero on mdev
- * device initialization, -errno on other failure.
+ * Note:
+ * 1. Plane could be disabled by guest. In that case, success will be
+ *    returned with zero-initialized drm_format, size, width and height
+ *    fields.
+ * 2. x_hot/y_hot is set to 0xFFFFFFFF if no hotspot information available
+ *
+ * Return: 0 on success, -errno on other failure.
  */
 struct vfio_device_gfx_plane_info {
 	__u32 argsz;
@@ -539,28 +544,25 @@ struct vfio_device_gfx_plane_info {
 	__u32 size;	/* size of plane in bytes, align on page*/
 	__u32 x_pos;	/* horizontal position of cursor plane */
 	__u32 y_pos;	/* vertical position of cursor plane*/
+	__u32 x_hot;    /* horizontal position of cursor hotspot */
+	__u32 y_hot;    /* vertical position of cursor hotspot */
 	union {
 		__u32 region_index;	/* region index */
-		__s32 dmabuf_id;	/* dma-buf fd */
+		__u32 dmabuf_id;	/* dma-buf id */
 	};
 };
 
 #define VFIO_DEVICE_QUERY_GFX_PLANE _IO(VFIO_TYPE, VFIO_BASE + 14)
 
 /**
- * VFIO_DEVICE_GET_GFX_DMABUF - _IOW(VFIO_TYPE, VFIO_BASE + 15,
- *				    struct vfio_device_gfx_dmabuf_fd)
+ * VFIO_DEVICE_GET_GFX_DMABUF - _IOW(VFIO_TYPE, VFIO_BASE + 15, __u32)
+ *
+ * Retrieve a dmabuf fd of an exposed guest framebuffer referenced by
+ * dmabuf_id which is returned from VFIO_DEVICE_QUERY_GFX_PLANE as a token
+ * of the exposed guest framebuffer.
  *
  * Return: 0 on success, -errno on failure.
  */
-struct vfio_device_gfx_dmabuf_fd {
-	__u32 argsz;
-	__u32 flags;
-	/* in */
-	__u32 dmabuf_id;
-	/* out */
-	__s32 dmabuf_fd;
-};
 
 #define VFIO_DEVICE_GET_GFX_DMABUF _IO(VFIO_TYPE, VFIO_BASE + 15)
 
