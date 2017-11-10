@@ -1769,12 +1769,15 @@ void dpy_gl_cursor_dmabuf(QemuConsole *con,
 }
 
 void dpy_gl_cursor_position(QemuConsole *con,
+                            bool have_hot, bool have_pos,
+                            uint32_t hot_x, uint32_t hot_y,
                             uint32_t pos_x, uint32_t pos_y)
 {
     assert(con->gl);
 
     if (con->gl->ops->dpy_gl_cursor_position) {
-        con->gl->ops->dpy_gl_cursor_position(con->gl, pos_x, pos_y);
+        con->gl->ops->dpy_gl_cursor_position(con->gl, have_hot, have_pos,
+                                             hot_x, hot_y, pos_x, pos_y);
     }
 }
 
