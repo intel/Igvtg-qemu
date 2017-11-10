@@ -121,6 +121,8 @@ void gd_egl_scanout_dmabuf(DisplayChangeListener *dcl,
 void gd_egl_cursor_dmabuf(DisplayChangeListener *dcl,
                           QemuDmaBuf *dmabuf);
 void gd_egl_cursor_position(DisplayChangeListener *dcl,
+                            bool have_hot, bool have_pos,
+                            uint32_t hot_x, uint32_t hot_y,
                             uint32_t pos_x, uint32_t pos_y);
 void gd_egl_release_dmabuf(DisplayChangeListener *dcl,
                            QemuDmaBuf *dmabuf);
