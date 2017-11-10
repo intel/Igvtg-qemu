@@ -36,10 +36,9 @@ static VFIODMABuf *vfio_display_get_dmabuf(VFIOPCIDevice *vdev,
                                            uint32_t plane_type)
 {
     struct vfio_device_gfx_plane_info plane;
-    struct vfio_device_gfx_dmabuf_fd gfd;
     VFIODMABuf *dmabuf;
     static int errcnt;
-    int ret;
+    int dmabuf_fd, ret;
 
     memset(&plane, 0, sizeof(plane));
     plane.argsz = sizeof(plane);
@@ -88,11 +87,8 @@ static VFIODMABuf *vfio_display_get_dmabuf(VFIOPCIDevice *vdev,
         }
     }
 
-    memset(&gfd, 0, sizeof(gfd));
-    gfd.argsz = sizeof(gfd);
-    gfd.dmabuf_id = plane.dmabuf_id;
-    ret = ioctl(vdev->vbasedev.fd, VFIO_DEVICE_GET_GFX_DMABUF, &gfd);
-    if (ret < 0) {
+    dmabuf_fd = ioctl(vdev->vbasedev.fd, VFIO_DEVICE_GET_GFX_DMABUF, &plane.dmabuf_id);
+    if (dmabuf_fd < 0) {
         fprintf(stderr, "(%d) ioctl VFIO_DEVICE_GET_GFX_DMABUF: %s\r",
                 ++errcnt, strerror(errno));
         return NULL;
@@ -107,7 +103,7 @@ static VFIODMABuf *vfio_display_get_dmabuf(VFIOPCIDevice *vdev,
             (plane.drm_format >> 16) & 0xff,
             (plane.drm_format >> 24) & 0xff,
             (plane_type == DRM_PLANE_TYPE_PRIMARY) ? "primary" : "cursor",
-            gfd.dmabuf_fd,
+            dmabuf_fd,
             plane.x_pos, plane.y_pos);
 
     dmabuf = g_new0(VFIODMABuf, 1);
@@ -116,7 +112,7 @@ static VFIODMABuf *vfio_display_get_dmabuf(VFIOPCIDevice *vdev,
     dmabuf->buf.height = plane.height;
     dmabuf->buf.stride = plane.stride;
     dmabuf->buf.fourcc = plane.drm_format;
-    dmabuf->buf.fd     = gfd.dmabuf_fd;
+    dmabuf->buf.fd     = dmabuf_fd;
     if (plane_type == DRM_PLANE_TYPE_CURSOR) {
         dmabuf->pos_x      = plane.x_pos;
         dmabuf->pos_y      = plane.y_pos;
