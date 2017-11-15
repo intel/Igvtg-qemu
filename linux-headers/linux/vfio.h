@@ -557,11 +557,9 @@ struct vfio_device_gfx_plane_info {
 /**
  * VFIO_DEVICE_GET_GFX_DMABUF - _IOW(VFIO_TYPE, VFIO_BASE + 15, __u32)
  *
- * Retrieve a dmabuf fd of an exposed guest framebuffer referenced by
- * dmabuf_id which is returned from VFIO_DEVICE_QUERY_GFX_PLANE as a token
- * of the exposed guest framebuffer.
- *
- * Return: 0 on success, -errno on failure.
+ * Return a new dma-buf file descriptor for an exposed guest framebuffer
+ * described by the provided dmabuf_id. The dmabuf_id is returned from VFIO_
+ * DEVICE_QUERY_GFX_PLANE as a token of the exposed guest framebuffer.
  */
 
 #define VFIO_DEVICE_GET_GFX_DMABUF _IO(VFIO_TYPE, VFIO_BASE + 15)
