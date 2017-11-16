@@ -339,13 +339,7 @@ ram_addr_t xen_ram_addr_from_mapcache(void *ptr)
     }
 
     entry = &mapcache->entry[paddr_index % mapcache->nr_buckets];
-    while (entry && (entry->paddr_index != paddr_index || entry->size != size  ||
-            !(((unsigned long)ptr >= (unsigned long)entry->vaddr_base) &&
-              ((unsigned long) ptr < (unsigned long) entry->vaddr_base + (unsigned long)entry->size)) ||
-              !test_bits(((unsigned long) ptr - (unsigned long) entry->vaddr_base) >> XC_PAGE_SHIFT,
-              1,
-             entry->valid_mapping))) {
-
+    while (entry && (entry->paddr_index != paddr_index || entry->size != size)) {
         entry = entry->next;
     }
     if (!entry) {
@@ -391,12 +385,7 @@ static void xen_invalidate_map_cache_entry_unlocked(uint8_t *buffer)
     }
 
     entry = &mapcache->entry[paddr_index % mapcache->nr_buckets];
-    while (entry && (entry->paddr_index != paddr_index || entry->size != size ||
-        !(((unsigned long)buffer >= (unsigned long)entry->vaddr_base)
-        && ((unsigned long) buffer < (unsigned long) entry->vaddr_base + (unsigned long)entry->size)) ||
-        !test_bits(((unsigned long) buffer - (unsigned long) entry->vaddr_base) >> XC_PAGE_SHIFT,
-        1,
-        entry->valid_mapping))) {
+    while (entry && (entry->paddr_index != paddr_index || entry->size != size)) {
         pentry = entry;
         entry = entry->next;
     }
@@ -445,26 +434,23 @@ void xen_invalidate_map_cache(void)
     for (i = 0; i < mapcache->nr_buckets; i++) {
         MapCacheEntry *entry = &mapcache->entry[i];
 
-        while(entry){
-            if (entry->vaddr_base == NULL) {
-                continue;
-            }
-            if (entry->lock > 0) {
-                continue;
-            }
-
-            if (munmap(entry->vaddr_base, entry->size) != 0) {
-                perror("unmap fails");
-                exit(-1);
-            }
-
-            entry->paddr_index = 0;
-            entry->vaddr_base = NULL;
-            entry->size = 0;
-            g_free(entry->valid_mapping);
-            entry->valid_mapping = NULL;
-            entry = entry->next;
+        if (entry->vaddr_base == NULL) {
+            continue;
         }
+        if (entry->lock > 0) {
+            continue;
+        }
+
+        if (munmap(entry->vaddr_base, entry->size) != 0) {
+            perror("unmap fails");
+            exit(-1);
+        }
+
+        entry->paddr_index = 0;
+        entry->vaddr_base = NULL;
+        entry->size = 0;
+        g_free(entry->valid_mapping);
+        entry->valid_mapping = NULL;
     }
 
     mapcache->last_entry = NULL;
