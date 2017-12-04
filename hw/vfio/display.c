@@ -169,8 +169,9 @@ static void vfio_display_dmabuf_update(void *opaque)
     cursor = vfio_display_get_dmabuf(vdev, DRM_PLANE_TYPE_CURSOR);
     if (vdev->cursor != cursor) {
         vdev->cursor = cursor;
-        dpy_gl_cursor_dmabuf(vdev->display_con,
-                             &cursor->buf);
+        if (cursor)
+            dpy_gl_cursor_dmabuf(vdev->display_con,
+                                 &cursor->buf);
         free_bufs = true;
     }
     if (cursor != NULL) {
