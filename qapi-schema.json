@@ -3282,7 +3282,8 @@
 # <- { "return": {} }
 #
 ##
-{ 'command': 'xen-save-devices-state', 'data': {'filename': 'str'} }
+{ 'command': 'xen-save-devices-state',
+  'data': {'filename': 'str', '*live': 'bool'} }
 
 ##
 # @xen-set-global-dirty-log:

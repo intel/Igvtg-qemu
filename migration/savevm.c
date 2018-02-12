@@ -2197,12 +2197,16 @@ int save_snapshot(const char *name, Error **errp)
     return ret;
 }
 
-void qmp_xen_save_devices_state(const char *filename, Error **errp)
+void qmp_xen_save_devices_state(const char *filename, bool has_live, bool live, Error **errp)
 {
     QEMUFile *f;
     QIOChannelFile *ioc;
     int saved_vm_running;
     int ret;
+
+    if (!has_live) {
+        live = true;
+    }
 
     saved_vm_running = runstate_is_running();
     vm_stop(RUN_STATE_SAVE_VM);
@@ -2218,6 +2222,14 @@ void qmp_xen_save_devices_state(const char *filename, Error **errp)
     qemu_fclose(f);
     if (ret < 0) {
         error_setg(errp, QERR_IO_ERROR);
+    } else {
+        if (live && !saved_vm_running) {
+            ret = bdrv_inactivate_all();
+            if (ret) {
+                error_setg(errp, "%s: bdrv_inactivate_all() failed (%d)",
+                           __func__, ret);
+            }
+        }
     }
 
  the_end:
