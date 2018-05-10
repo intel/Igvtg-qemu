@@ -309,6 +309,12 @@ struct vfio_region_info_cap_type {
 /* Mdev sub-type for device state save and restore */
 #define VFIO_REGION_SUBTYPE_DEVICE_STATE	(1)
 
+/* Offset in region to save device state */
+#define VFIO_DEVICE_STATE_OFFSET	1
+
+#define VFIO_DEVICE_START	0
+#define VFIO_DEVICE_STOP	1
+
 /*
  * The MSIX mappable capability informs that MSIX data of a BAR can be mmapped
  * which allows direct access to non-MSIX registers which happened to be within
