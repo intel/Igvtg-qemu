@@ -302,6 +302,14 @@ struct vfio_region_info_cap_type {
 #define VFIO_REGION_SUBTYPE_INTEL_IGD_LPC_CFG	(3)
 
 /*
+ * The region type device state is for save or restore the vfio device during
+ * migration. 
+ */
+#define VFIO_REGION_TYPE_DEVICE_STATE		(1 << 30)
+/* Mdev sub-type for device state save and restore */
+#define VFIO_REGION_SUBTYPE_DEVICE_STATE	(1)
+
+/*
  * The MSIX mappable capability informs that MSIX data of a BAR can be mmapped
  * which allows direct access to non-MSIX registers which happened to be within
  * the same system page.

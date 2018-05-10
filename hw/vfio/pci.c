@@ -33,6 +33,7 @@
 #include "pci.h"
 #include "trace.h"
 #include "qapi/error.h"
+#include "migration/blocker.h"
 
 #define MSIX_CAP_LENGTH 12
 
@@ -2985,6 +2986,25 @@ static void vfio_realize(PCIDevice *pdev, Error **errp)
         vfio_vga_quirk_setup(vdev);
     }
 
+    struct vfio_region_info *device_state;
+    /* device state region setup */
+    if (!vfio_get_dev_region_info(&vdev->vbasedev,
+                VFIO_REGION_TYPE_DEVICE_STATE,
+                VFIO_REGION_SUBTYPE_DEVICE_STATE, &device_state)) {
+        memcpy(&vdev->device_state, device_state,
+               sizeof(struct vfio_region_info));
+        g_free(device_state);
+    } else {
+        error_setg(&vdev->migration_blocker,
+                "Migration disabled: cannot support device state region");
+        migrate_add_blocker(vdev->migration_blocker, &err);
+        if (err) {
+            error_propagate(errp, err);
+            error_free(vdev->migration_blocker);
+            goto error;
+        }
+    }
+
     for (i = 0; i < PCI_ROM_SLOT; i++) {
         vfio_bar_quirk_setup(vdev, i);
     }
@@ -3055,6 +3075,10 @@ out_teardown:
     vfio_teardown_msi(vdev);
     vfio_bars_exit(vdev);
 error:
+    if (vdev->migration_blocker) {
+        migrate_del_blocker(vdev->migration_blocker);
+        error_free(vdev->migration_blocker);
+    }
     error_prepend(errp, ERR_PREFIX, vdev->vbasedev.name);
 }
 
