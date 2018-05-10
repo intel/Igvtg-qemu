@@ -35,6 +35,7 @@
 #include "sysemu/kvm.h"
 #include "trace.h"
 #include "qapi/error.h"
+#include "exec/ram_addr.h"
 
 struct vfio_group_head vfio_group_list =
     QLIST_HEAD_INITIALIZER(vfio_group_list);
@@ -692,9 +693,42 @@ static void vfio_listener_region_del(MemoryListener *listener,
     }
 }
 
+static void vfio_log_sync(MemoryListener *listener,
+                          MemoryRegionSection *section)
+{
+    VFIOContainer *container = container_of(listener, VFIOContainer, listener);
+    VFIOGroup *group = QLIST_FIRST(&container->group_list);
+    VFIODevice *vbasedev;
+    QLIST_FOREACH(vbasedev, &group->device_list, next) {
+        if (vbasedev->device_state == VFIO_DEVICE_START) {
+            return;
+        }
+    }
+
+    struct vfio_iommu_get_dirty_bitmap *d;
+    ram_addr_t size = int128_get64(section->size);
+    unsigned long page_nr = size >> TARGET_PAGE_BITS;
+    unsigned long bitmap_size =
+                    (BITS_TO_LONGS(page_nr) + 1) * sizeof(unsigned long);
+    d = g_malloc0(sizeof(*d) + bitmap_size);
+    d->start_addr = section->offset_within_address_space;
+    d->page_nr = page_nr;
+
+    if (ioctl(container->fd, VFIO_IOMMU_GET_DIRTY_BITMAP, d)) {
+        error_report("vfio: Failed to fetch dirty pages for migration");
+        goto exit;
+    }
+
+    cpu_physical_memory_set_dirty_lebitmap((unsigned long *)&d->dirty_bitmap,
+                                           d->start_addr, d->page_nr);
+exit:
+    g_free(d);
+}
+
 static const MemoryListener vfio_memory_listener = {
     .region_add = vfio_listener_region_add,
     .region_del = vfio_listener_region_del,
+    .log_sync = vfio_log_sync,
 };
 
 static void vfio_listener_release(VFIOContainer *container)
