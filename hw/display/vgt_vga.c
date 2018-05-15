@@ -78,6 +78,7 @@ int guest_domid = 0;
 
 static int vgt_host_pci_cfg_get(VGTHostDevice *host_dev,
                                 void *data, int len, uint32_t addr);
+static void cpu_update_state(void *pv, int running, RunState state);
  
 
 void vgt_bridge_pci_write(PCIDevice *dev,
@@ -308,6 +309,7 @@ static void vgt_initfn(PCIDevice *dev, Error **errp)
     vgt_host_dev_init(dev, &d->host_dev);
     d->domid = vgt_get_domid();
     d->state.parent = d;
+    qemu_add_vm_change_state_handler(cpu_update_state, d);
 }
 
 DeviceState *vgt_vga_init(PCIBus *pci_bus)
@@ -370,6 +372,42 @@ DeviceState *vgt_vga_init(PCIBus *pci_bus)
     qdev_init_nofail(&dev->qdev);
     printf("Create vgt VGA successfully\n");
     return DEVICE(dev);
+}
+
+static void vgt_pause(int domid, bool dev_state)
+{
+    char file_name[PATH_MAX] = {0};
+    FILE *fp = NULL;
+    int err = 0;
+
+    snprintf(file_name, PATH_MAX, "/sys/kernel/vgt/vm%d/schedule", domid);
+
+    fp = fopen(file_name, "w");
+    if (fp == NULL) {
+        err = errno;
+        qemu_log("vGT: open %s failed\n", file_name);
+    }
+
+    if (!err && fprintf(fp, "%d\n", !dev_state) < 0) {
+        err = errno;
+    }
+
+    if (!err && fclose(fp) != 0) {
+        err = errno;
+    }
+
+    if (err) {
+        qemu_log("vGT: %s failed: errno=%d\n", __func__, err);
+        exit(-1);
+    }
+}
+
+static void cpu_update_state(void *pv, int running, RunState state)
+{
+    VGTVGAState *d = (VGTVGAState *) pv;
+    if (!running) {
+        vgt_pause(d->domid, true);
+    }
 }
 
 static void read_write_state(QEMUFile *f, VGTVGAState *d, bool is_read)
@@ -439,6 +477,7 @@ static int vgt_device_get(QEMUFile *f, void *pv,
 
     read_write_state(f, d, false);
 
+    vgt_pause(d->domid, false);
     return 0;
 }
 
