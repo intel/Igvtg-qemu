@@ -266,6 +266,18 @@ void graphic_hw_update(QemuConsole *con)
     }
 }
 
+uint32_t graphic_get_plane_id(QemuConsole *con, uint32_t plane_type)
+{
+    uint32_t ret = 0;
+    if (!con) {
+        con = active_console;
+    }
+    if (con && con->hw_ops->gfx_get_plane_id) {
+        ret = con->hw_ops->gfx_get_plane_id(con->hw, plane_type);
+    }
+    return ret;
+}
+
 void graphic_hw_gl_block(QemuConsole *con, bool block)
 {
     assert(con != NULL);
