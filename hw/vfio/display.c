@@ -166,8 +166,28 @@ static void vfio_display_dmabuf_update(void *opaque)
     }
 }
 
+static uint32_t vfio_display_get_plane_id(void *opaque, uint32_t plane_type)
+{
+    VFIOPCIDevice *vdev = opaque;
+    struct vfio_device_gfx_plane_info plane;
+    int ret;
+
+    memset(&plane, 0, sizeof(plane));
+    plane.argsz = sizeof(plane);
+    plane.flags = VFIO_GFX_PLANE_TYPE_DRM | VFIO_GFX_PLANE_TYPE_PROBE;
+    plane.drm_plane_type = plane_type;
+
+    ret = ioctl(vdev->vbasedev.fd, VFIO_DEVICE_QUERY_GFX_PLANE, &plane);
+    if (ret < 0) {
+        return 0;
+    }
+
+    return plane.drm_fb_id;
+}
+
 static const GraphicHwOps vfio_display_dmabuf_ops = {
     .gfx_update = vfio_display_dmabuf_update,
+    .gfx_get_plane_id = vfio_display_get_plane_id,
 };
 
 static int vfio_display_dmabuf_init(VFIOPCIDevice *vdev, Error **errp)
