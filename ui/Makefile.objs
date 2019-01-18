@@ -12,6 +12,7 @@ common-obj-y += input.o input-keymap.o input-legacy.o kbd-state.o
 common-obj-y += input-barrier.o
 common-obj-$(CONFIG_LINUX) += input-linux.o
 common-obj-$(CONFIG_LIBSYSTEMD) += logind.o
+common-obj-$(CONFIG_LIBINPUT) += libinput.o
 common-obj-$(CONFIG_SPICE) += spice-core.o spice-input.o spice-display.o
 common-obj-$(CONFIG_COCOA) += cocoa.o
 common-obj-$(CONFIG_VNC) += $(vnc-obj-y)
@@ -72,3 +73,6 @@ egl-headless.o-libs += $(OPENGL_LIBS)
 
 logind.o-cflags := $(LIBSYSTEMD_CFLAGS)
 logind.o-libs := $(LIBSYSTEMD_LIBS)
+
+libinput.o-cflags := $(LIBINPUT_CFLAGS)
+libinput.o-libs := $(LIBINPUT_LIBS) $(LIBUDEV_LIBS)

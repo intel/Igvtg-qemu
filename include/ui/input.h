@@ -117,4 +117,22 @@ extern const guint16 qemu_input_map_xorgxwin_to_qcode[];
 extern const guint qemu_input_map_osx_to_qcode_len;
 extern const guint16 qemu_input_map_osx_to_qcode[];
 
+/* ui/libinput.c */
+struct udev;
+typedef bool (*input_libinput_hook)(QKbdState *state, int qcode, bool down,
+                                    void *opaque);
+InputLibinput *input_libinput_init_udev(QemuConsole *con,
+                                        struct udev *udev, const char *seat,
+                                        Error **errp);
+InputLibinput *input_libinput_init_path(QemuConsole *con,
+                                        Error **errp);
+void *input_libinput_path_add_device(InputLibinput *il, const char *path,
+                                     Error **errp);
+void input_libinput_path_del_device(InputLibinput *il, void *dev);
+void input_libinput_path_set_grab(InputLibinput *il, bool enable);
+void input_libinput_set_hook(InputLibinput *il,
+                             input_libinput_hook hook,
+                             void *opaque);
+void input_libinput_exit(InputLibinput *il);
+
 #endif /* INPUT_H */
