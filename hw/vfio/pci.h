@@ -69,6 +69,7 @@ typedef struct VFIOMigration {
     uint32_t data_caps;
     uint32_t device_state;
     uint64_t devconfig_size;
+    uint64_t devmem_size;
     VMChangeStateEntry *vm_state;
 } VFIOMigration;
 

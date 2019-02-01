@@ -203,6 +203,201 @@ static int vfio_load_data_device_config(VFIOPCIDevice *vdev,
     return 0;
 }
 
+static int vfio_get_device_memory_size(VFIOPCIDevice *vdev)
+{
+    VFIODevice *vbasedev = &vdev->vbasedev;
+    VFIORegion *region_ctl =
+        &vdev->migration->region[VFIO_DEVSTATE_REGION_CTL];
+    uint64_t len;
+    int sz;
+
+    sz = sizeof(len);
+    if (pread(vbasedev->fd, &len, sz,
+                region_ctl->fd_offset +
+                offsetof(struct vfio_device_state_ctl, device_memory.size))
+            != sz) {
+        error_report("vfio: Failed to get length of device memory");
+        return -1;
+    }
+    vdev->migration->devmem_size = len;
+    return 0;
+}
+
+static int vfio_set_device_memory_size(VFIOPCIDevice *vdev, uint64_t size)
+{
+    VFIODevice *vbasedev = &vdev->vbasedev;
+    VFIORegion *region_ctl =
+        &vdev->migration->region[VFIO_DEVSTATE_REGION_CTL];
+    int sz;
+
+    sz = sizeof(size);
+    if (pwrite(vbasedev->fd, &size, sz,
+                region_ctl->fd_offset +
+                offsetof(struct vfio_device_state_ctl, device_memory.size))
+            != sz) {
+        error_report("vfio: Failed to set length of device comemory");
+        return -1;
+    }
+    vdev->migration->devmem_size = size;
+    return 0;
+}
+
+static
+int vfio_save_data_device_memory_chunk(VFIOPCIDevice *vdev, QEMUFile *f,
+                                    uint64_t pos, uint64_t len)
+{
+    VFIODevice *vbasedev = &vdev->vbasedev;
+    VFIORegion *region_ctl =
+        &vdev->migration->region[VFIO_DEVSTATE_REGION_CTL];
+    VFIORegion *region_devmem =
+        &vdev->migration->region[VFIO_DEVSTATE_REGION_DATA_DEVICE_MEMORY];
+    void *dest;
+    uint32_t sz;
+    uint8_t *buf = NULL;
+    uint32_t action = VFIO_DEVICE_DATA_ACTION_GET_BUFFER;
+
+    if (len > region_devmem->size) {
+        return -1;
+    }
+
+    sz = sizeof(pos);
+    if (pwrite(vbasedev->fd, &pos, sz,
+                region_ctl->fd_offset +
+                offsetof(struct vfio_device_state_ctl, device_memory.pos))
+            != sz) {
+        error_report("vfio: Failed to set save buffer pos");
+        return -1;
+    }
+    sz = sizeof(action);
+    if (pwrite(vbasedev->fd, &action, sz,
+                region_ctl->fd_offset +
+                offsetof(struct vfio_device_state_ctl, device_memory.action))
+            != sz) {
+        error_report("vfio: Failed to set save buffer action");
+        return -1;
+    }
+
+    if (!vfio_device_state_region_mmaped(region_devmem)) {
+        buf = g_malloc(len);
+        if (buf == NULL) {
+            error_report("vfio: Failed to allocate memory for migrate");
+            return -1;
+        }
+        if (pread(vbasedev->fd, buf, len, region_devmem->fd_offset) != len) {
+            error_report("vfio: error load device memory buffer");
+            return -1;
+        }
+        qemu_put_be64(f, len);
+        qemu_put_be64(f, pos);
+        qemu_put_buffer(f, buf, len);
+        g_free(buf);
+    } else {
+        dest = region_devmem->mmaps[0].mmap;
+        qemu_put_be64(f, len);
+        qemu_put_be64(f, pos);
+        qemu_put_buffer(f, dest, len);
+    }
+    return 0;
+}
+
+static int vfio_save_data_device_memory(VFIOPCIDevice *vdev, QEMUFile *f)
+{
+    VFIORegion *region_devmem =
+        &vdev->migration->region[VFIO_DEVSTATE_REGION_DATA_DEVICE_MEMORY];
+    uint64_t total_len = vdev->migration->devmem_size;
+    uint64_t pos = 0;
+
+    qemu_put_be64(f, total_len);
+    while (pos < total_len) {
+        uint64_t len = region_devmem->size;
+
+        if (pos + len >= total_len) {
+            len = total_len - pos;
+        }
+        if (vfio_save_data_device_memory_chunk(vdev, f, pos, len)) {
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+static
+int vfio_load_data_device_memory_chunk(VFIOPCIDevice *vdev, QEMUFile *f,
+                                uint64_t pos, uint64_t len)
+{
+    VFIODevice *vbasedev = &vdev->vbasedev;
+    VFIORegion *region_ctl =
+        &vdev->migration->region[VFIO_DEVSTATE_REGION_CTL];
+    VFIORegion *region_devmem =
+        &vdev->migration->region[VFIO_DEVSTATE_REGION_DATA_DEVICE_MEMORY];
+
+    void *dest;
+    uint32_t sz;
+    uint8_t *buf = NULL;
+    uint32_t action = VFIO_DEVICE_DATA_ACTION_SET_BUFFER;
+
+    if (len > region_devmem->size) {
+        return -1;
+    }
+
+    sz = sizeof(pos);
+    if (pwrite(vbasedev->fd, &pos, sz,
+                region_ctl->fd_offset +
+                offsetof(struct vfio_device_state_ctl, device_memory.pos))
+            != sz) {
+        error_report("vfio: Failed to set device memory buffer pos");
+        return -1;
+    }
+    if (!vfio_device_state_region_mmaped(region_devmem)) {
+        buf = g_malloc(len);
+        if (buf == NULL) {
+            error_report("vfio: Failed to allocate memory for migrate");
+            return -1;
+        }
+        qemu_get_buffer(f, buf, len);
+        if (pwrite(vbasedev->fd, buf, len,
+                    region_devmem->fd_offset) != len) {
+            error_report("vfio: Failed to load devie memory buffer");
+            return -1;
+        }
+        g_free(buf);
+    } else {
+        dest = region_devmem->mmaps[0].mmap;
+        qemu_get_buffer(f, dest, len);
+    }
+
+    sz = sizeof(action);
+    if (pwrite(vbasedev->fd, &action, sz,
+                region_ctl->fd_offset +
+                offsetof(struct vfio_device_state_ctl, device_memory.action))
+            != sz) {
+        error_report("vfio: Failed to set load device memory buffer action");
+        return -1;
+    }
+
+    return 0;
+
+}
+
+static int vfio_load_data_device_memory(VFIOPCIDevice *vdev,
+                        QEMUFile *f, uint64_t total_len)
+{
+    uint64_t pos = 0, len = 0;
+
+    vfio_set_device_memory_size(vdev, total_len);
+
+    while (pos + len < total_len) {
+        len = qemu_get_be64(f);
+        pos = qemu_get_be64(f);
+
+        vfio_load_data_device_memory_chunk(vdev, f, pos, len);
+    }
+
+    return 0;
+}
+
+
 static int vfio_set_dirty_page_bitmap_chunk(VFIOPCIDevice *vdev,
         uint64_t start_addr, uint64_t page_nr)
 {
@@ -377,6 +572,10 @@ static void vfio_save_live_pending(QEMUFile *f, void *opaque,
         return;
     }
 
+    /* get dirty data size of device memory */
+    vfio_get_device_memory_size(vdev);
+
+    *res_precopy_only += vdev->migration->devmem_size;
     return;
 }
 
@@ -388,7 +587,9 @@ static int vfio_save_iterate(QEMUFile *f, void *opaque)
         return 0;
     }
 
-    return 0;
+    qemu_put_byte(f, VFIO_SAVE_FLAG_DEVMEMORY);
+    /* get dirty data of device memory */
+    return vfio_save_data_device_memory(vdev, f);
 }
 
 static void vfio_pci_load_config(VFIOPCIDevice *vdev, QEMUFile *f)
@@ -458,6 +659,10 @@ static int vfio_load_state(QEMUFile *f, void *opaque, int version_id)
             len = qemu_get_be64(f);
             vfio_load_data_device_config(vdev, f, len);
             break;
+        case VFIO_SAVE_FLAG_DEVMEMORY:
+            len = qemu_get_be64(f);
+            vfio_load_data_device_memory(vdev, f, len);
+            break;
         default:
             ret = -EINVAL;
         }
@@ -503,6 +708,13 @@ static int vfio_save_complete_precopy(QEMUFile *f, void *opaque)
     VFIOPCIDevice *vdev = opaque;
     int rc = 0;
 
+    if (vfio_device_data_cap_device_memory(vdev)) {
+        qemu_put_byte(f, VFIO_SAVE_FLAG_DEVMEMORY | VFIO_SAVE_FLAG_CONTINUE);
+        /* get dirty data of device memory */
+        vfio_get_device_memory_size(vdev);
+        rc = vfio_save_data_device_memory(vdev, f);
+    }
+
     qemu_put_byte(f, VFIO_SAVE_FLAG_PCI | VFIO_SAVE_FLAG_CONTINUE);
     vfio_pci_save_config(vdev, f);
 
@@ -515,12 +727,22 @@ static int vfio_save_complete_precopy(QEMUFile *f, void *opaque)
 
 static int vfio_save_setup(QEMUFile *f, void *opaque)
 {
+    int rc = 0;
     VFIOPCIDevice *vdev = opaque;
-    qemu_put_byte(f, VFIO_SAVE_FLAG_SETUP);
+
+    if (vfio_device_data_cap_device_memory(vdev)) {
+        qemu_put_byte(f, VFIO_SAVE_FLAG_SETUP | VFIO_SAVE_FLAG_CONTINUE);
+        qemu_put_byte(f, VFIO_SAVE_FLAG_DEVMEMORY);
+        /* get whole snapshot of device memory */
+        vfio_get_device_memory_size(vdev);
+        rc = vfio_save_data_device_memory(vdev, f);
+    } else {
+        qemu_put_byte(f, VFIO_SAVE_FLAG_SETUP);
+    }
 
     vfio_set_device_state(vdev, VFIO_DEVICE_STATE_RUNNING |
             VFIO_DEVICE_STATE_LOGGING);
-    return 0;
+    return rc;
 }
 
 static int vfio_load_setup(QEMUFile *f, void *opaque)
@@ -576,8 +798,11 @@ int vfio_migration_init(VFIOPCIDevice *vdev, Error **errp)
         goto error;
     }
 
-    if (vfio_device_data_cap_device_memory(vdev)) {
-        error_report("No suppport of data cap device memory Yet");
+    if (vfio_device_data_cap_device_memory(vdev) &&
+            vfio_device_state_region_setup(vdev,
+              &vdev->migration->region[VFIO_DEVSTATE_REGION_DATA_DEVICE_MEMORY],
+              VFIO_REGION_SUBTYPE_DEVICE_STATE_DATA_MEMORY,
+              "device-state-data-device-memory")) {
         goto error;
     }
 
