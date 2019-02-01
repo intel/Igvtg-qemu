@@ -27,6 +27,7 @@
 
 #include "hw/vfio/vfio-common.h"
 #include "hw/vfio/vfio.h"
+#include "hw/vfio/pci.h"
 #include "exec/address-spaces.h"
 #include "exec/memory.h"
 #include "hw/hw.h"
@@ -698,9 +699,34 @@ static void vfio_listener_region_del(MemoryListener *listener,
     }
 }
 
+static void vfio_log_sync(MemoryListener *listener,
+                          MemoryRegionSection *section)
+{
+    VFIOContainer *container = container_of(listener, VFIOContainer, listener);
+    VFIOGroup *group = QLIST_FIRST(&container->group_list);
+    VFIODevice *vbasedev;
+    VFIOPCIDevice *vdev;
+
+    ram_addr_t size = int128_get64(section->size);
+    uint64_t page_nr = size >> TARGET_PAGE_BITS;
+    uint64_t start_addr = section->offset_within_address_space;
+
+    QLIST_FOREACH(vbasedev, &group->device_list, next) {
+        vdev = container_of(vbasedev, VFIOPCIDevice, vbasedev);
+        if (!vdev->migration ||
+                !vfio_device_data_cap_system_memory(vdev) ||
+                !(vdev->migration->device_state & VFIO_DEVICE_STATE_LOGGING)) {
+            continue;
+        }
+
+        vfio_set_dirty_page_bitmap(vdev, start_addr, page_nr);
+    }
+}
+
 static const MemoryListener vfio_memory_listener = {
     .region_add = vfio_listener_region_add,
     .region_del = vfio_listener_region_del,
+    .log_sync = vfio_log_sync,
 };
 
 static void vfio_listener_release(VFIOContainer *container)
