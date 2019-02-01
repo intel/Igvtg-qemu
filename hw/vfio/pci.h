@@ -19,6 +19,7 @@
 #include "qemu/event_notifier.h"
 #include "qemu/queue.h"
 #include "qemu/timer.h"
+#include "sysemu/sysemu.h"
 
 #define PCI_ANY_ID (~0)
 
@@ -55,6 +56,21 @@ typedef struct VFIOBAR {
     bool mem64;
     QLIST_HEAD(, VFIOQuirk) quirks;
 } VFIOBAR;
+
+enum {
+    VFIO_DEVSTATE_REGION_CTL = 0,
+    VFIO_DEVSTATE_REGION_DATA_CONFIG,
+    VFIO_DEVSTATE_REGION_DATA_DEVICE_MEMORY,
+    VFIO_DEVSTATE_REGION_DATA_BITMAP,
+    VFIO_DEVSTATE_REGION_NUM,
+};
+typedef struct VFIOMigration {
+    VFIORegion region[VFIO_DEVSTATE_REGION_NUM];
+    uint32_t data_caps;
+    uint32_t device_state;
+    uint64_t devconfig_size;
+    VMChangeStateEntry *vm_state;
+} VFIOMigration;
 
 typedef struct VFIOVGARegion {
     MemoryRegion mem;
@@ -132,6 +148,8 @@ typedef struct VFIOPCIDevice {
     VFIOBAR bars[PCI_NUM_REGIONS - 1]; /* No ROM */
     VFIOVGA *vga; /* 0xa0000, 0x3b0, 0x3c0 */
     void *igd_opregion;
+    VFIOMigration *migration;
+    Error *migration_blocker;
     PCIHostDeviceAddress host;
     EventNotifier err_notifier;
     EventNotifier req_notifier;
@@ -198,5 +216,10 @@ int vfio_pci_igd_opregion_init(VFIOPCIDevice *vdev,
 void vfio_display_reset(VFIOPCIDevice *vdev);
 int vfio_display_probe(VFIOPCIDevice *vdev, Error **errp);
 void vfio_display_finalize(VFIOPCIDevice *vdev);
-
+bool vfio_device_data_cap_system_memory(VFIOPCIDevice *vdev);
+bool vfio_device_data_cap_device_memory(VFIOPCIDevice *vdev);
+int vfio_set_dirty_page_bitmap(VFIOPCIDevice *vdev,
+         uint64_t start_addr, uint64_t page_nr);
+int vfio_migration_init(VFIOPCIDevice *vdev, Error **errp);
+void vfio_migration_finalize(VFIOPCIDevice *vdev);
 #endif /* HW_VFIO_VFIO_PCI_H */

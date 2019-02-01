@@ -32,6 +32,7 @@
 #endif
 
 #define VFIO_MSG_PREFIX "vfio %s: "
+#define TYPE_VFIO_PCI "vfio-pci"
 
 enum {
     VFIO_DEVICE_TYPE_PCI = 0,

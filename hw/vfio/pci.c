@@ -37,7 +37,6 @@
 
 #define MSIX_CAP_LENGTH 12
 
-#define TYPE_VFIO_PCI "vfio-pci"
 #define PCI_VFIO(obj)    OBJECT_CHECK(VFIOPCIDevice, obj, TYPE_VFIO_PCI)
 
 static void vfio_disable_interrupts(VFIOPCIDevice *vdev);
