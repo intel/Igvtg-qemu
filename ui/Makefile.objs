@@ -55,7 +55,7 @@ common-obj-$(CONFIG_OPENGL) += shader.o
 common-obj-$(CONFIG_OPENGL) += console-gl.o
 common-obj-$(CONFIG_OPENGL) += egl-helpers.o
 common-obj-$(CONFIG_OPENGL) += egl-context.o
-common-obj-$(CONFIG_OPENGL_DMABUF) += egl-headless.o
+common-obj-$(CONFIG_OPENGL_DMABUF) += egl-headless.o kms.o
 
 shader.o-libs += $(OPENGL_LIBS)
 console-gl.o-libs += $(OPENGL_LIBS)

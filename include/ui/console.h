@@ -186,6 +186,11 @@ struct QemuDmaBuf {
     uint32_t  stride;
     uint32_t  fourcc;
     uint32_t  texture;
+    uint32_t  format;	/* drm format of plane */
+    uint64_t  format_mod;   /* tiled mode */
+
+    uint32_t handle;
+    uint32_t drm_id;
 };
 
 typedef struct DisplayChangeListenerOps {

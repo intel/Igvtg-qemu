@@ -2169,6 +2169,9 @@ static void parse_display(const char *p)
             error_report("VNC requires a display argument vnc=<display>");
             exit(1);
         }
+    } else if (strstart(p, "kms", &opts)) {
+        display_opengl = 1;
+        dpy.type = DISPLAY_TYPE_KMS;
     } else if (strstart(p, "egl-headless", &opts)) {
         dpy.type = DISPLAY_TYPE_EGL_HEADLESS;
     } else if (strstart(p, "curses", &opts)) {
