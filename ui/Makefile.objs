@@ -40,6 +40,12 @@ gtk.mo-objs += gtk-gl-area.o
 endif
 endif
 
+# ui-drm module
+common-obj-$(CONFIG_UI_DRM) += drm.mo
+drm.mo-objs := drm.o
+drm.mo-cflags := $(LIBDRM_CFLAGS)
+drm.mo-libs := $(LIBDRM_LIBS) $(LIBUDEV_LIBS)
+
 ifeq ($(CONFIG_X11),y)
 sdl.mo-objs += x_keymap.o
 gtk.mo-objs += x_keymap.o
