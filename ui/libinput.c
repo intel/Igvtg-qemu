@@ -97,6 +97,15 @@ static void input_libinput_kbd_event(InputLibinput *il,
     int lcode = libinput_event_keyboard_get_key(kbd);
     int qcode = qemu_input_linux_to_qcode(lcode);
 
+    if (qkbd_state_modifier_get(il->kbd, QKBD_MOD_CTRL) &&
+        qkbd_state_modifier_get(il->kbd, QKBD_MOD_ALT)) {
+        /* ctrl-alt-<hotkey> */
+        if (qcode == Q_KEY_CODE_BACKSPACE) {
+            qemu_system_shutdown_request(SHUTDOWN_CAUSE_HOST_QMP_QUIT);
+            return;
+        }
+    }
+
     qkbd_state_key_event(il->kbd, qcode, down);
     il->events++;
 }
