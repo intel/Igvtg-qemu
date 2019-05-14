@@ -366,6 +366,7 @@ vnc_sasl=""
 vnc_jpeg=""
 vnc_png=""
 xkbcommon=""
+libsystemd=""
 xen=""
 xen_ctrl_version=""
 xen_pci_passthrough=""
@@ -3273,6 +3274,21 @@ if test "$xkbcommon" != "no" ; then
   fi
 fi
 
+
+##########################################
+# libsystemd probe (dbus library)
+if test "$libsystemd" != "no" ; then
+  if $pkg_config libsystemd --atleast-version=221; then
+    libsystemd_cflags=$($pkg_config libsystemd --cflags)
+    libsystemd_libs=$($pkg_config libsystemd --libs)
+    libsystemd=yes
+  else
+    if test "$libsystemd" = "yes" ; then
+      feature_not_found "libsystemd" "Install systemd-devel"
+    fi
+    libsystemd=no
+  fi
+fi
 
 ##########################################
 # xfsctl() probe, used for file-posix.c
@@ -6636,6 +6652,11 @@ fi
 if test "$xkbcommon" = "yes" ; then
   echo "XKBCOMMON_CFLAGS=$xkbcommon_cflags" >> $config_host_mak
   echo "XKBCOMMON_LIBS=$xkbcommon_libs" >> $config_host_mak
+fi
+if test "$libsystemd" = "yes" ; then
+  echo "CONFIG_LIBSYSTEMD=y" >> $config_host_mak
+  echo "LIBSYSTEMD_CFLAGS=$libsystemd_cflags" >> $config_host_mak
+  echo "LIBSYSTEMD_LIBS=$libsystemd_libs" >> $config_host_mak
 fi
 if test "$xfs" = "yes" ; then
   echo "CONFIG_XFS=y" >> $config_host_mak
