@@ -1094,6 +1094,21 @@
   'data'    : { '*charset'       : 'str' } }
 
 ##
+# @DisplayDRM:
+#
+# DRM display options.
+#
+# @mode: video mode.
+# @output: display output.
+#
+# Since: 4.1
+#
+##
+{ 'struct'  : 'DisplayDRM',
+  'data'    : { '*mode'          : 'str',
+                '*output'        : 'str' } }
+
+##
 # @DisplayType:
 #
 # Display (user interface) type.
@@ -1133,7 +1148,7 @@
 { 'enum'    : 'DisplayType',
   'data'    : [ 'default', 'none', 'gtk', 'sdl',
                 'egl-headless', 'curses', 'cocoa',
-                'spice-app'] }
+                'spice-app', 'drm'] }
 
 ##
 # @DisplayOptions:
@@ -1156,7 +1171,8 @@
   'discriminator' : 'type',
   'data'    : { 'gtk'            : 'DisplayGTK',
                 'curses'         : 'DisplayCurses',
-                'egl-headless'   : 'DisplayEGLHeadless'} }
+                'egl-headless'   : 'DisplayEGLHeadless',
+                'drm'            : 'DisplayDRM'} }
 
 ##
 # @query-display-options:

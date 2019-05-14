@@ -434,6 +434,7 @@ libusb=""
 usb_redir=""
 opengl=""
 opengl_dmabuf="no"
+libdrm=""
 cpuid_h="no"
 avx2_opt=""
 zlib="yes"
@@ -4160,6 +4161,19 @@ if test "$opengl" = "yes" && test "$have_x11" = "yes"; then
   done
 fi
 
+if test "$libdrm" != "no" ; then
+  if $pkg_config libdrm; then
+    libdrm_cflags="$($pkg_config --cflags libdrm)"
+    libdrm_libs="$($pkg_config --libs libdrm)"
+    libdrm=yes
+  else
+    if test "$libdrm" = "yes" ; then
+      feature_not_found "libdrm" "Please install libdrm-devel"
+    fi
+    libdrm=no
+  fi
+fi
+
 ##########################################
 # libxml2 probe
 if test "$libxml2" != "no" ; then
@@ -6421,6 +6435,7 @@ echo "libusb            $libusb"
 echo "usb net redir     $usb_redir"
 echo "OpenGL support    $opengl"
 echo "OpenGL dmabufs    $opengl_dmabuf"
+echo "DRM support       $libdrm"
 echo "libiscsi support  $libiscsi"
 echo "libnfs support    $libnfs"
 echo "build guest agent $guest_agent"
@@ -6976,6 +6991,13 @@ if test "$opengl" = "yes" ; then
   if test "$opengl_dmabuf" = "yes" ; then
     echo "CONFIG_OPENGL_DMABUF=y" >> $config_host_mak
   fi
+fi
+
+if test "$libdrm" = "yes" ; then
+  echo "CONFIG_UI_DRM=m" >> $config_host_mak
+  echo "CONFIG_LIBDRM=y" >> $config_host_mak
+  echo "LIBDRM_CFLAGS=$libdrm_cflags" >> $config_host_mak
+  echo "LIBDRM_LIBS=$libdrm_libs" >> $config_host_mak
 fi
 
 if test "$malloc_trim" = "yes" ; then
