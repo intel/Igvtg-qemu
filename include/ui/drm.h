@@ -4,8 +4,22 @@
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 
+#if defined(CONFIG_OPENGL_DMABUF)
+# include <gbm.h>
+# include <epoxy/gl.h>
+# include <epoxy/egl.h>
+# include "ui/egl-helpers.h"
+#endif
+
 typedef struct QemuDRMDisplay QemuDRMDisplay;
 typedef struct QemuDRMFramebuffer QemuDRMFramebuffer;
+typedef enum QemuGLMode QemuGLMode;
+
+enum QemuGLMode {
+    QEMU_GL_RENDER_SURFACE = 0,
+    QEMU_GL_DIRECT_DMABUF,
+    QEMU_GL_RENDER_DMABUF,
+};
 
 struct QemuDRMDisplay {
     const char *seat;
@@ -27,6 +41,22 @@ struct QemuDRMDisplay {
     drmModeModeInfo *mode;
     QemuDRMFramebuffer *dumb;
     QemuDRMFramebuffer *cursor;
+
+#if defined(CONFIG_OPENGL_DMABUF)
+    /* opengl */
+    bool enable_direct;
+    struct gbm_device *gbm_dev;
+    QemuGLShader *gls;
+    QemuGLMode glmode;
+    QemuDRMFramebuffer *gbm_fb;
+    QemuDRMFramebuffer *gbm_cursor;
+    QemuDmaBuf *guest;
+
+    QemuDmaBuf *blit;
+    bool blit_flip;
+    egl_fb blit_fb;
+    egl_fb guest_fb;
+#endif
 };
 
 struct QemuDRMFramebuffer {
@@ -44,6 +74,11 @@ struct QemuDRMFramebuffer {
     uint32_t size;
     void *mem;
     pixman_image_t *image;
+
+#if defined(CONFIG_OPENGL_DMABUF)
+    /* opengl */
+    struct gbm_bo *gbm_bo;
+#endif
 };
 
 /* ui/drm.c */
@@ -66,5 +101,9 @@ void drm_dcl_mouse_set(DisplayChangeListener *dcl,
                        int x, int y, int visible);
 void drm_dcl_cursor_define(DisplayChangeListener *dcl,
                            QEMUCursor *c);
+
+/* ui/drm-egl.c */
+extern const DisplayChangeListenerOps drm_egl_dcl_ops;
+int drm_egl_init(QemuDRMDisplay *drm, DisplayOptions *opts, Error **errp);
 
 #endif /* QEMU_UI_DRM_H */
