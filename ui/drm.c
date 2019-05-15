@@ -156,6 +156,12 @@ void drm_fb_destroy(QemuDRMFramebuffer *fb)
         .handle = fb->handle,
     };
 
+#if defined(CONFIG_OPENGL_DMABUF)
+    if (fb->gbm_bo) {
+        gbm_bo_destroy(fb->gbm_bo);
+        destroy.handle = 0;
+    }
+#endif
     if (fb->image) {
         pixman_image_unref(fb->image);
     }
@@ -500,6 +506,19 @@ static void drm_display_init(DisplayState *ds, DisplayOptions *o)
         goto err_close_drm;
     }
 
+    if (o->has_gl && o->gl != DISPLAYGL_MODE_OFF) {
+#if defined(CONFIG_OPENGL_DMABUF)
+        if (drm_egl_init(drm, o, errp) < 0) {
+            goto err_close_drm;
+        }
+        drm->dcl.ops = &drm_egl_dcl_ops;
+#else
+        error_setg(errp, "drm: compiled without opengl support");
+#endif
+    } else {
+        drm->dcl.ops = &drm_dcl_ops;
+    }
+
     drm->dumb = drm_fb_create_dumb(drm,
                                    drm->mode->hdisplay,
                                    drm->mode->vdisplay,
@@ -514,7 +533,6 @@ static void drm_display_init(DisplayState *ds, DisplayOptions *o)
 
     drm->exit.notify = drm_display_exit_notifier;
     qemu_add_exit_notifier(&drm->exit);
-    drm->dcl.ops = &drm_dcl_ops;
     drm->dcl.con = con;
     register_displaychangelistener(&drm->dcl);
     drm_ui_info(drm);
@@ -531,9 +549,19 @@ err_free_drm:
     return;
 }
 
+static void early_drm_display_init(DisplayOptions *opts)
+{
+#if defined(CONFIG_OPENGL_DMABUF)
+    if (opts->has_gl && opts->gl != DISPLAYGL_MODE_OFF) {
+        display_opengl = 1;
+    }
+#endif
+}
+
 static QemuDisplay qemu_display_drm = {
     .type       = DISPLAY_TYPE_DRM,
     .init       = drm_display_init,
+    .early_init = early_drm_display_init,
 };
 
 static void register_drm(void)

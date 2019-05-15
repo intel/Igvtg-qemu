@@ -1100,13 +1100,18 @@
 #
 # @mode: video mode.
 # @output: display output.
+# @rendernode: Which DRM render node should be used. Default is the first
+#              available node on the host.
+# @enable-direct: enable direct mapping of vgpu guest framebuffer to host crtc.
 #
 # Since: 4.1
 #
 ##
 { 'struct'  : 'DisplayDRM',
   'data'    : { '*mode'          : 'str',
-                '*output'        : 'str' } }
+                '*output'        : 'str',
+                '*rendernode'    : 'str',
+                '*enable-direct' : 'bool' } }
 
 ##
 # @DisplayType:
