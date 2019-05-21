@@ -287,6 +287,22 @@ void egl_dmabuf_release_texture(QemuDmaBuf *dmabuf)
     dmabuf->texture = 0;
 }
 
+void egl_dmabuf_print(QemuDmaBuf *dmabuf, const char *prefix)
+{
+    fprintf(stderr, "%s: dmabuf %dx%d, stride %d, format %c%c%c%c, "
+            "modifier %d,0x%" PRIx64 ", y0-top %s | fd %d, texture %d\n",
+            prefix,
+            dmabuf->width, dmabuf->height, dmabuf->stride,
+            (dmabuf->fourcc >>  0) & 0xff,
+            (dmabuf->fourcc >>  8) & 0xff,
+            (dmabuf->fourcc >> 16) & 0xff,
+            (dmabuf->fourcc >> 24) & 0xff,
+            (int)(dmabuf->modifier >> 56),
+            (uint64_t)(dmabuf->modifier & 0x00ffffffffffffffLL),
+            dmabuf->y0_top ? "yes" : "no",
+            dmabuf->fd, dmabuf->texture);
+}
+
 #endif /* CONFIG_OPENGL_DMABUF */
 
 /* ---------------------------------------------------------------------- */
