@@ -1111,7 +1111,8 @@
   'data'    : { '*mode'          : 'str',
                 '*output'        : 'str',
                 '*rendernode'    : 'str',
-                '*enable-direct' : 'bool' } }
+                '*enable-direct' : 'bool',
+  		'*enable-drmlease' : 'bool' } }
 
 ##
 # @DisplayType:

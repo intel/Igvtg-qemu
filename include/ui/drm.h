@@ -45,6 +45,7 @@ struct QemuDRMDisplay {
 #if defined(CONFIG_OPENGL_DMABUF)
     /* opengl */
     bool enable_direct;
+    bool enable_drmlease;
     struct gbm_device *gbm_dev;
     QemuGLShader *gls;
     QemuGLMode glmode;
