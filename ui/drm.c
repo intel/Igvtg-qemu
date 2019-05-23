@@ -530,10 +530,10 @@ static void drm_display_init(DisplayState *ds, DisplayOptions *o)
     drm->saved_crtc = drmModeGetCrtc(drm->fd, drm->enc->crtc_id);
     drm_mode_init(drm, o->u.drm.has_mode ? o->u.drm.mode : NULL);
 
-    drm->il = input_libinput_init(con, drm->udev, drm->seat, errp);
-    if (!drm->il) {
-        goto err_close_drm;
-    }
+    /*drm->il = input_libinput_init(con, drm->udev, drm->seat, errp);*/
+    /*if (!drm->il) {*/
+        /*goto err_close_drm;*/
+    /*}*/
 
     if (o->has_gl && o->gl != DISPLAYGL_MODE_OFF) {
 #if defined(CONFIG_OPENGL_DMABUF)
