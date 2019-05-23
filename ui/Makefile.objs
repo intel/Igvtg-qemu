@@ -42,9 +42,9 @@ endif
 
 # ui-drm module
 common-obj-$(CONFIG_UI_DRM) += drm.mo
-drm.mo-objs := drm.o
-drm.mo-cflags := $(LIBDRM_CFLAGS)
-drm.mo-libs := $(LIBDRM_LIBS) $(LIBUDEV_LIBS)
+drm.mo-objs := drm.o drm-lease.o
+drm.mo-cflags := $(LIBDRM_CFLAGS) $(XCB_RANDR_CFLAGS)
+drm.mo-libs := $(LIBDRM_LIBS) $(LIBUDEV_LIBS) $(XCB_RANDR_LIBS)
 ifeq ($(CONFIG_OPENGL_DMABUF),y)
 drm.mo-objs += drm-egl.o
 drm.mo-libs += $(OPENGL_LIBS)

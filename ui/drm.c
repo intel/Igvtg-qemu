@@ -476,33 +476,42 @@ static void drm_display_init(DisplayState *ds, DisplayOptions *o)
         drm->seat = DEFAULT_SEAT;
     }
 
-    /* find & open drm device */
     drm->udev = udev_new();
-    uenum = udev_enumerate_new(drm->udev);
-    udev_enumerate_add_match_subsystem(uenum, "drm");
-    udev_enumerate_add_match_tag(uenum, "seat");
-    udev_enumerate_scan_devices(uenum);
-    ulist = udev_enumerate_get_list_entry(uenum);
-    udev_list_entry_foreach(uentry, ulist) {
-        const char *path = udev_list_entry_get_name(uentry);
-        struct udev_device *device =
-            udev_device_new_from_syspath(drm->udev, path);
-        const char *node = udev_device_get_devnode(device);
-        const char *seat = udev_device_get_property_value(device, "ID_SEAT");
-        if (!node) {
-            continue;
+
+    if (getenv("DISPLAY") != NULL) {
+        drm->fd = drm_lease_xserver(o->u.drm.output, errp);
+        if (*errp) {
+            goto err_free_drm;
         }
-        if (strcmp(seat ?: DEFAULT_SEAT, drm->seat) != 0) {
-            continue;
+        use_libinput = false;
+    } else {
+	/* find & open drm device */
+	uenum = udev_enumerate_new(drm->udev);
+	udev_enumerate_add_match_subsystem(uenum, "drm");
+	udev_enumerate_add_match_tag(uenum, "seat");
+	udev_enumerate_scan_devices(uenum);
+	ulist = udev_enumerate_get_list_entry(uenum);
+	udev_list_entry_foreach(uentry, ulist) {
+	    const char *path = udev_list_entry_get_name(uentry);
+	    struct udev_device *device =
+		udev_device_new_from_syspath(drm->udev, path);
+	    const char *node = udev_device_get_devnode(device);
+	    const char *seat = udev_device_get_property_value(device, "ID_SEAT");
+	    if (!node) {
+		continue;
+	    }
+	    if (strcmp(seat ?: DEFAULT_SEAT, drm->seat) != 0) {
+		continue;
+	    }
+	    drm->device = device;
+	    break;
+	}
+	drm->fd = open(udev_device_get_devnode(drm->device), O_RDWR);
+        if (drm->fd < 0) {
+            error_setg_errno(errp, errno, "drm: open %s",
+                             udev_device_get_devnode(drm->device));
+            goto err_free_drm;
         }
-        drm->device = device;
-        break;
-    }
-    drm->fd = open(udev_device_get_devnode(drm->device), O_RDWR);
-    if (drm->fd < 0) {
-        error_setg_errno(errp, errno, "drm: open %s",
-                         udev_device_get_devnode(drm->device));
-        goto err_free_drm;
     }
 
     drm_conn_find(drm, o->u.drm.has_output ? o->u.drm.output : NULL);

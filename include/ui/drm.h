@@ -106,4 +106,7 @@ void drm_dcl_cursor_define(DisplayChangeListener *dcl,
 extern const DisplayChangeListenerOps drm_egl_dcl_ops;
 int drm_egl_init(QemuDRMDisplay *drm, DisplayOptions *opts, Error **errp);
 
+/* ui/drm-lease.c */
+int drm_lease_xserver(const char *output, Error **errp);
+
 #endif /* QEMU_UI_DRM_H */

@@ -441,6 +441,7 @@ usb_redir=""
 opengl=""
 opengl_dmabuf="no"
 libdrm=""
+randr=""
 cpuid_h="no"
 avx2_opt=""
 zlib="yes"
@@ -4182,6 +4183,19 @@ if test "$libdrm" != "no" ; then
   fi
 fi
 
+if test "$randr" != "no" ; then
+  if $pkg_config xcb-randr --atleast-version=1.13; then
+    randr_cflags="$($pkg_config --cflags xcb-randr xcb)"
+    randr_libs="$($pkg_config --libs xcb-randr xcb)"
+    randr=yes
+  else
+    if test "$libdrm" = "yes" ; then
+      feature_not_found "libdrm" "Please install libxcb-devel"
+    fi
+    randr=no
+  fi
+fi
+
 ##########################################
 # libxml2 probe
 if test "$libxml2" != "no" ; then
@@ -6442,6 +6456,7 @@ echo "usb net redir     $usb_redir"
 echo "OpenGL support    $opengl"
 echo "OpenGL dmabufs    $opengl_dmabuf"
 echo "DRM support       $libdrm"
+echo "XRandR support    $randr"
 echo "libiscsi support  $libiscsi"
 echo "libnfs support    $libnfs"
 echo "build guest agent $guest_agent"
@@ -7020,6 +7035,12 @@ if test "$libdrm" = "yes" ; then
   echo "CONFIG_LIBDRM=y" >> $config_host_mak
   echo "LIBDRM_CFLAGS=$libdrm_cflags" >> $config_host_mak
   echo "LIBDRM_LIBS=$libdrm_libs" >> $config_host_mak
+fi
+
+if test "$randr" = "yes" ; then
+  echo "CONFIG_XCB_RANDR=y" >> $config_host_mak
+  echo "XCB_RANDR_CFLAGS=$randr_cflags" >> $config_host_mak
+  echo "XCB_RANDR_LIBS=$randr_libs" >> $config_host_mak
 fi
 
 if test "$malloc_trim" = "yes" ; then
