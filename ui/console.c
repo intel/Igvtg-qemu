@@ -269,6 +269,24 @@ void graphic_hw_update(QemuConsole *con)
     }
 }
 
+void graphic_hw_refresh(QemuConsole *con)
+{
+    DisplayState *ds;
+    DisplayChangeListener *dcl;
+
+    if (!con) {
+        con = active_console;
+    }
+
+    ds = con->ds;
+
+    QLIST_FOREACH(dcl, &ds->listeners, next) {
+        if (dcl->ops->dpy_refresh) {
+            dcl->ops->dpy_refresh(dcl);
+        }
+    }
+}
+
 void graphic_hw_gl_block(QemuConsole *con, bool block)
 {
     assert(con != NULL);
@@ -1486,6 +1504,23 @@ void update_displaychangelistener(DisplayChangeListener *dcl,
         timer_mod(ds->gui_timer, ds->last_update + interval);
     }
 }
+
+void dpy_update_interval(QemuConsole *con, uint64_t interval)
+{
+    DisplayChangeListener *dcl;
+    DisplayState *ds;
+
+    if (!con) {
+        return;
+    }
+
+    ds = con->ds;
+
+    QLIST_FOREACH(dcl, &ds->listeners, next) {
+        update_displaychangelistener(dcl, interval);
+    }
+}
+
 
 void unregister_displaychangelistener(DisplayChangeListener *dcl)
 {
