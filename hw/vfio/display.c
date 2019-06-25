@@ -288,44 +288,49 @@ static void vfio_display_dmabuf_update(void *opaque)
     VFIODMABuf *primary, *cursor;
     bool free_bufs = false, new_cursor = false;;
 
-    primary = vfio_display_get_dmabuf(vdev, DRM_PLANE_TYPE_PRIMARY);
-    if (primary == NULL) {
-        if (dpy->ramfb) {
-            ramfb_display_update(dpy->con, dpy->ramfb);
+    if (!dpy->event_flags ||
+        (dpy->event_flags & VFIO_IRQ_EVENT_PRIMRAY_PLANE_FLIP)) {
+        primary = vfio_display_get_dmabuf(vdev, DRM_PLANE_TYPE_PRIMARY);
+        if (primary == NULL) {
+            if (dpy->ramfb) {
+                ramfb_display_update(dpy->con, dpy->ramfb);
+            }
+            return;
         }
-        return;
+        if (dpy->dmabuf.primary != primary) {
+            dpy->dmabuf.primary = primary;
+            qemu_console_resize(dpy->con,
+                                primary->buf.width, primary->buf.height);
+            dpy_gl_scanout_dmabuf(dpy->con, &primary->buf);
+            free_bufs = true;
+        }
     }
 
-    if (dpy->dmabuf.primary != primary) {
-        dpy->dmabuf.primary = primary;
-        qemu_console_resize(dpy->con,
-                            primary->buf.width, primary->buf.height);
-        dpy_gl_scanout_dmabuf(dpy->con, &primary->buf);
-        free_bufs = true;
-    }
+    if (!dpy->event_flags ||
+        (dpy->event_flags & VFIO_IRQ_EVENT_CURSOR_PLANE_FLIP)) {
+        cursor = vfio_display_get_dmabuf(vdev, DRM_PLANE_TYPE_CURSOR);
+        if (dpy->dmabuf.cursor != cursor) {
+            dpy->dmabuf.cursor = cursor;
+            new_cursor = true;
+            free_bufs = true;
+        }
 
-    cursor = vfio_display_get_dmabuf(vdev, DRM_PLANE_TYPE_CURSOR);
-    if (dpy->dmabuf.cursor != cursor) {
-        dpy->dmabuf.cursor = cursor;
-        new_cursor = true;
-        free_bufs = true;
-    }
+        if (cursor && (new_cursor || cursor->hot_updates)) {
+            bool have_hot = (cursor->hot_x != 0xffffffff &&
+                             cursor->hot_y != 0xffffffff);
+            dpy_gl_cursor_dmabuf(dpy->con, &cursor->buf, have_hot,
+                                 cursor->hot_x, cursor->hot_y);
+            cursor->hot_updates = 0;
+        } else if (!cursor && new_cursor) {
+            dpy_gl_cursor_dmabuf(dpy->con, NULL, false, 0, 0);
+        }
 
-    if (cursor && (new_cursor || cursor->hot_updates)) {
-        bool have_hot = (cursor->hot_x != 0xffffffff &&
-                         cursor->hot_y != 0xffffffff);
-        dpy_gl_cursor_dmabuf(dpy->con, &cursor->buf, have_hot,
-                             cursor->hot_x, cursor->hot_y);
-        cursor->hot_updates = 0;
-    } else if (!cursor && new_cursor) {
-        dpy_gl_cursor_dmabuf(dpy->con, NULL, false, 0, 0);
-    }
-
-    if (cursor && cursor->pos_updates) {
-        dpy_gl_cursor_position(dpy->con,
-                               cursor->pos_x,
-                               cursor->pos_y);
-        cursor->pos_updates = 0;
+        if (cursor && cursor->pos_updates) {
+            dpy_gl_cursor_position(dpy->con,
+                                   cursor->pos_x,
+                                   cursor->pos_y);
+            cursor->pos_updates = 0;
+        }
     }
 
     dpy_gl_update(dpy->con, 0, 0, primary->buf.width, primary->buf.height);
@@ -340,6 +345,7 @@ static const GraphicHwOps vfio_display_dmabuf_ops = {
     .ui_info    = vfio_display_edid_ui_info,
 };
 
+static int vfio_register_display_notifier(VFIOPCIDevice *vdev);
 static int vfio_display_dmabuf_init(VFIOPCIDevice *vdev, Error **errp)
 {
     if (!display_opengl) {
@@ -355,6 +361,8 @@ static int vfio_display_dmabuf_init(VFIOPCIDevice *vdev, Error **errp)
         vdev->dpy->ramfb = ramfb_setup(DEVICE(vdev), errp);
     }
     vfio_display_edid_init(vdev);
+    vfio_register_display_notifier(vdev);
+
     return 0;
 }
 
@@ -495,6 +503,161 @@ static void vfio_display_region_exit(VFIODisplay *dpy)
 
 /* ---------------------------------------------------------------------- */
 
+static void primary_plane_update(void *opaque)
+{
+    VFIOPCIDevice *vdev = opaque;
+    VFIODisplay *dpy = vdev->dpy;
+
+    if (!event_notifier_test_and_clear(&dpy->pri_event_notifier)) {
+        return;
+    }
+
+    dpy->event_flags |= VFIO_IRQ_EVENT_PRIMRAY_PLANE_FLIP;
+    graphic_hw_refresh(dpy->con);
+    dpy->event_flags &= ~VFIO_IRQ_EVENT_PRIMRAY_PLANE_FLIP;
+}
+
+static void cursor_plane_update(void *opaque)
+{
+    VFIOPCIDevice *vdev = opaque;
+    VFIODisplay *dpy = vdev->dpy;
+    /* static int times; */
+
+    if (!event_notifier_test_and_clear(&dpy->cur_event_notifier)) {
+        return;
+    }
+
+    /* Have to skip some cursor events due to performance impact */
+
+    /* if (times++ / 2) { */
+    /*     times = 0; */
+
+    dpy->event_flags |= VFIO_IRQ_EVENT_CURSOR_PLANE_FLIP;
+    graphic_hw_refresh(dpy->con);
+    dpy->event_flags &= ~VFIO_IRQ_EVENT_CURSOR_PLANE_FLIP;
+    /* } */
+}
+
+static int vfio_register_display_notifier(VFIOPCIDevice *vdev)
+{
+    VFIODisplay *dpy = vdev->dpy;
+    struct vfio_irq_info *irq;
+    struct vfio_irq_set *irq_set;
+    int argsz;
+    int *pfd;
+    int ret;
+
+    ret = vfio_get_dev_irq_info(&vdev->vbasedev,
+                                VFIO_IRQ_TYPE_GFX,
+                                VFIO_IRQ_SUBTYPE_GFX_DISPLAY_IRQ,
+                                &irq);
+    if (ret || !irq->count) {
+        goto out;
+    }
+
+    ret = event_notifier_init(&dpy->pri_event_notifier, 0);
+    if (ret) {
+        error_report("vfio: Unable to init event notifier for device request");
+        goto out;
+    }
+
+    ret = event_notifier_init(&dpy->cur_event_notifier, 0);
+    if (ret) {
+        error_report("vfio: Unable to init event notifier for device request");
+        goto out;
+    }
+
+    argsz = sizeof(*irq_set) + sizeof(pfd) * irq->count;
+
+    irq_set = g_malloc0(argsz);
+    irq_set->argsz = argsz;
+    irq_set->flags = VFIO_IRQ_SET_DATA_EVENTFD |
+                     VFIO_IRQ_SET_ACTION_TRIGGER;
+    irq_set->index = irq->index;
+    irq_set->start = 0;
+    irq_set->count = irq->count;
+    pfd = (int32_t *)&irq_set->data;
+
+    pfd[0] = event_notifier_get_fd(&dpy->pri_event_notifier);
+    pfd[1] = event_notifier_get_fd(&dpy->cur_event_notifier);
+    qemu_set_fd_handler(pfd[0], primary_plane_update, NULL, vdev);
+    qemu_set_fd_handler(pfd[1], cursor_plane_update, NULL, vdev);
+    ret = ioctl(vdev->vbasedev.fd, VFIO_DEVICE_SET_IRQS, irq_set);
+    if (ret) {
+        error_report("vfio: Failed to set up device request notification");
+        qemu_set_fd_handler(pfd[0], NULL, NULL, vdev);
+        qemu_set_fd_handler(pfd[1], NULL, NULL, vdev);
+        event_notifier_cleanup(&dpy->pri_event_notifier);
+        event_notifier_cleanup(&dpy->cur_event_notifier);
+    }
+
+    dpy->irq_index = irq_set->index;
+    dpy->event_flags = VFIO_IRQ_EVENT_ENABLE;
+
+    g_free(irq_set);
+
+out:
+    return ret;
+}
+
+static void unregister_display_notifier(VFIOPCIDevice *vdev,
+                                       uint32_t type, uint32_t subtype)
+{
+    VFIODisplay *dpy = vdev->dpy;
+    int argsz;
+    struct vfio_irq_info *irq;
+    struct vfio_irq_set *irq_set;
+    int32_t *pfd;
+    int ret;
+
+    if (!(dpy->event_flags & VFIO_IRQ_EVENT_ENABLE)) {
+        return;
+    }
+
+    ret = vfio_get_dev_irq_info(&vdev->vbasedev,
+                                type,
+                                subtype,
+                                &irq);
+    if (ret) {
+        return ;
+    }
+
+    argsz = sizeof(*irq_set) + sizeof(*pfd);
+
+    irq_set = g_malloc0(argsz);
+    irq_set->argsz = argsz;
+    irq_set->flags = VFIO_IRQ_SET_DATA_EVENTFD |
+                     VFIO_IRQ_SET_ACTION_TRIGGER;
+    irq_set->index = irq->index;
+    irq_set->start = 0;
+    irq_set->count = irq->count;
+    pfd = (int32_t *)&irq_set->data;
+    pfd[0] = -1;
+    pfd[1] = -1;
+
+    if (ioctl(vdev->vbasedev.fd, VFIO_DEVICE_SET_IRQS, irq_set)) {
+        error_report("vfio: Failed to de-assign device request fd: %m");
+    }
+    g_free(irq_set);
+    qemu_set_fd_handler(event_notifier_get_fd(&dpy->pri_event_notifier),
+                        NULL, NULL, vdev);
+    qemu_set_fd_handler(event_notifier_get_fd(&dpy->cur_event_notifier),
+                        NULL, NULL, vdev);
+
+    event_notifier_cleanup(&dpy->pri_event_notifier);
+    event_notifier_cleanup(&dpy->cur_event_notifier);
+}
+
+static void vfio_unregister_display_notifier(VFIOPCIDevice *vdev)
+{
+    VFIODisplay *dpy = vdev->dpy;
+
+    unregister_display_notifier(vdev, VFIO_IRQ_TYPE_GFX,
+                                VFIO_IRQ_SUBTYPE_GFX_DISPLAY_IRQ);
+
+    dpy->event_flags = false;
+}
+
 int vfio_display_probe(VFIOPCIDevice *vdev, Error **errp)
 {
     struct vfio_device_gfx_plane_info probe;
@@ -531,6 +694,7 @@ void vfio_display_finalize(VFIOPCIDevice *vdev)
         return;
     }
 
+    vfio_unregister_display_notifier(vdev);
     graphic_console_close(vdev->dpy->con);
     vfio_display_dmabuf_exit(vdev->dpy);
     vfio_display_region_exit(vdev->dpy);
