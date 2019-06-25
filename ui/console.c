@@ -243,7 +243,7 @@ static void gui_setup_refresh(DisplayState *ds)
             have_text = true;
         }
     }
-
+    need_timer = false;
     if (need_timer && ds->gui_timer == NULL) {
         ds->gui_timer = timer_new_ms(QEMU_CLOCK_REALTIME, gui_update, ds);
         timer_mod(ds->gui_timer, qemu_clock_get_ms(QEMU_CLOCK_REALTIME));
