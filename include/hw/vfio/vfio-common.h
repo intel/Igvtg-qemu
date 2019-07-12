@@ -26,6 +26,7 @@
 #include "qemu/notify.h"
 #include "ui/console.h"
 #include "hw/display/ramfb.h"
+#include "qemu/event_notifier.h"
 #ifdef CONFIG_LINUX
 #include <linux/vfio.h>
 #endif
@@ -146,6 +147,9 @@ typedef struct VFIODisplay {
     struct vfio_region_gfx_edid *edid_regs;
     uint8_t *edid_blob;
     QEMUTimer *edid_link_timer;
+    EventNotifier vblank_notifier;
+    uint32_t irq_index;
+    uint32_t event_flags;
     struct {
         VFIORegion buffer;
         DisplaySurface *surface;
