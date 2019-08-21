@@ -25,8 +25,6 @@ enum QKbdModifier {
     QKBD_MOD__MAX
 };
 
-typedef struct QKbdState QKbdState;
-
 /**
  * qkbd_state_init: init keyboard state tracker.
  *

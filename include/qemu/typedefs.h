@@ -107,6 +107,7 @@ typedef struct QemuSpin QemuSpin;
 typedef struct QEMUTimer QEMUTimer;
 typedef struct QEMUTimerListGroup QEMUTimerListGroup;
 typedef struct QJSON QJSON;
+typedef struct QKbdState QKbdState;
 typedef struct QList QList;
 typedef struct QNull QNull;
 typedef struct QNum QNum;
