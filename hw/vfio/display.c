@@ -528,7 +528,7 @@ static void vblank_handler(void *opaque)
 
     counter++;
     dpy->event_flags = 1;
-
+    graphic_hw_refresh(dpy->con);
     vfio_unmask_single_irqindex(&vdev->vbasedev, dpy->irq_index);
 }
 
